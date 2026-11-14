@@ -21,6 +21,10 @@ Built by **404 Not Founders** for **Hack The Nest** — first playable draft.
   prediction accuracy, the destination's surface-gravity clock rate, and a persistent mission log.
 - **Age** — the crew, the Earth twin and the locals age through baby → toddler → child → teen →
   adult → elderly → skeleton as accumulated time crosses each threshold.
+- **Relativity Lab** — a flight console with four camera perspectives (first-, second- and
+  third-person, plus a bird's-eye system map), a synchronized Point A / Point B split screen, live
+  digital clocks, spacecraft and G-force telemetry, and full start / pause / resume / reset control
+  over a segmented acceleration–cruise–deceleration flight.
 
 ## Run it
 
@@ -61,6 +65,27 @@ Simplifications for this draft: one-way trips at constant velocity (no accelerat
 no orbital motion, no gravitational lensing. Speeds and mission profiles are hypothetical; the
 destinations are real.
 
+## Relativity Lab model
+
+The lab solves a one-way trip between two stations that share one inertial frame:
+
+- The ship leaves Point A at rest, holds a constant **proper acceleration** until it reaches the
+  requested cruise speed (or half the route, whichever comes first), coasts, then decelerates
+  symmetrically into Point B. Coordinate time, distance and velocity come from the closed-form
+  hyperbolic-motion solution; the ship's proper time is integrated along the worldline.
+- Gravitational time dilation uses the weak-field clock rate `√(1 − rₛ/r)` and is integrated while
+  the ship climbs out of, and settles into, each planet's potential well. Deep-space cruise uses 1.
+- Acceleration is **not** treated as a direct cause of time dilation: it alters the ship's proper
+  time only through the velocity it produces and the potential it traverses. G-force is reported
+  separately as `a / 9.80665 m/s²` (current, maximum and flight average).
+- Points A and B are modelled at rest relative to each other, so their clocks differ only by the
+  gravitational rate at each surface. The split screen shows the same mission from both ends of the
+  route — the ship recedes at A, approaches at B — with each observer's elapsed time, distance,
+  light-travel lag and relativistic Doppler factor.
+- Changing the start, destination, speed, acceleration or duration re-solves the profile and replays
+  the flight. Route length is the radial separation of the two catalog distances from Earth (the
+  smallest possible separation); true separations need sky positions the archive export lacks.
+
 ## Project structure
 
 ```
@@ -71,7 +96,10 @@ src/
   lib/planet.js           classification, palettes, procedural textures, star colour
   lib/aging.js            biological stages
   lib/simulation.js       localStorage mission log
+  lib/labPhysics.js       Relativity Lab flight solver, proper-time integration, telemetry
+  lib/labCatalog.js       lab stations (Earth + archive worlds) and route distances
   components/             scene, HUD, picker, flight plan, journey, debrief
+  components/lab/         flight console: cameras, split screen, dashboard, controls
 ```
 
 ## Roadmap
