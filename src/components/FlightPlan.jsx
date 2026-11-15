@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { C_KM_S, formatNumber, clamp } from '../lib/physics'
-import { classifyPlanet, starSpectralClass } from '../lib/planet'
+import { C_KM_S, formatNumber, formatYears, clamp } from '../lib/physics'
+import { classifyPlanet, describeStar } from '../lib/planet'
 
 const PRESETS = [0.5, 0.8, 0.9, 0.99, 0.999]
 
@@ -40,13 +40,15 @@ function SpeedField({ beta, onChange }) {
           }
         }}
       />
-      <span className="text-[12px] text-muted">% of c</span>
+      <span className="text-[12px] text-ink/60">% of c</span>
     </div>
   )
 }
 
 export default function FlightPlan({
+  origin,
   planet,
+  distanceLy,
   beta,
   onBetaChange,
   shipName,
@@ -57,6 +59,7 @@ export default function FlightPlan({
   onBack,
 }) {
   const look = classifyPlanet(planet)
+  const star = describeStar(planet)
   const pct = ((beta - 0.05) / (0.999 - 0.05)) * 100
 
   return (
@@ -67,13 +70,15 @@ export default function FlightPlan({
           <h1 className="mt-1 text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
             Configure the spacecraft
           </h1>
-          <p className="mt-1 text-[13px] text-muted">
-            Target <span className="text-ink">{planet.name}</span> · {formatNumber(planet.distanceLy, 2)} ly
-            out · host star {planet.star ?? planet.name} ({starSpectralClass(planet)})
+          <p className="mt-1 text-[13px] text-ink/65">
+            <span className="text-ink">{origin.name}</span> <span className="text-ink/45">→</span>{' '}
+            <span className="text-ink">{planet.name}</span> ·{' '}
+            {formatNumber(distanceLy, distanceLy < 1 ? 4 : 2)} ly · host star {star.name} (
+            {star.spectral})
           </p>
         </div>
         <button type="button" className="btn text-xs" onClick={onBack}>
-          ← Change destination
+          ← Change route
         </button>
       </div>
 
@@ -82,32 +87,38 @@ export default function FlightPlan({
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="label">Cruise speed</div>
-              <div className="num mt-1 text-4xl font-semibold tracking-tight text-ion">
-                {beta.toFixed(3)}<span className="ml-1 text-lg text-ion/70">c</span>
+              <div className="num mt-1 text-4xl font-semibold tracking-tight text-ink">
+                {beta.toFixed(3)}<span className="ml-1 text-lg text-ink/60">c</span>
               </div>
-              <div className="num mt-1 text-[11px] text-muted">
+              <div className="num mt-1 text-[11px] text-ink/55">
                 {formatNumber(beta * C_KM_S, 0)} km/s
               </div>
             </div>
-            <div className="rounded-lg border border-line/70 bg-white/[0.02] px-2.5 py-1.5 text-right">
-              <div className="text-[9px] tracking-[0.14em] text-muted uppercase">Lorentz factor</div>
-              <div className="num text-[11px] text-muted/80">γ hidden until arrival</div>
+            <div className="rounded-lg border border-line/50 bg-void/60 px-2.5 py-1.5 text-right">
+              <div className="text-[9px] tracking-[0.14em] text-ink/50 uppercase">Lorentz factor</div>
+              <div className="num text-[11px] text-ink/60">γ hidden until arrival</div>
             </div>
           </div>
 
           <div>
-            <input
-              type="range"
-              className="slider"
-              min="0.05"
-              max="0.999"
-              step="0.001"
-              value={beta}
-              aria-label="Max velocity as a fraction of the speed of light"
-              style={{ '--pct': `${pct}%` }}
-              onChange={(event) => onBetaChange(Number(event.target.value))}
-            />
-            <div className="mt-1 flex justify-between text-[10px] text-muted/70">
+            <div className="relative h-[18px]">
+              <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-line/60" />
+              <div
+                className="absolute top-1/2 left-0 h-1.5 -translate-y-1/2 rounded-full bg-ion"
+                style={{ width: `${pct}%` }}
+              />
+              <input
+                type="range"
+                className="slider relative"
+                min="0.05"
+                max="0.999"
+                step="0.001"
+                value={beta}
+                aria-label="Max velocity as a fraction of the speed of light"
+                onChange={(event) => onBetaChange(Number(event.target.value))}
+              />
+            </div>
+            <div className="mt-1 flex justify-between text-[10px] text-ink/45">
               <span className="num">0.05 c</span>
               <span className="num">0.999 c</span>
             </div>
@@ -120,7 +131,7 @@ export default function FlightPlan({
                 <button
                   key={preset}
                   type="button"
-                  className={`chip ${Math.abs(preset - beta) < 0.0005 ? 'border-ion/60 text-ion' : ''}`}
+                  className={`chip ${Math.abs(preset - beta) < 0.0005 ? 'border-ion text-white' : ''}`}
                   onClick={() => onBetaChange(preset)}
                 >
                   {preset} c
@@ -129,7 +140,7 @@ export default function FlightPlan({
             </div>
           </div>
 
-          <div className="rounded-xl border border-line/70 bg-void/40 px-3.5 py-3">
+          <div className="rounded-xl border border-line/50 bg-void/50 px-3.5 py-3">
             <div className="label text-[9px]">Spacecraft</div>
             <input
               className="field mt-2"
@@ -138,7 +149,7 @@ export default function FlightPlan({
               aria-label="Spacecraft name"
               onChange={(event) => onShipNameChange(event.target.value)}
             />
-            <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            <p className="mt-2 text-[11px] leading-relaxed text-ink/55">
               Constant velocity for this draft. Acceleration and deceleration phases are the next
               iteration — at 1 g you could cross the galaxy in a human lifetime.
             </p>
@@ -149,15 +160,15 @@ export default function FlightPlan({
           <div className="panel p-5 sm:p-6">
             <div className="label">Stage 3 — Predict</div>
             <h2 className="mt-1 text-lg font-semibold tracking-tight">Two clocks, one trip</h2>
-            <p className="mt-1.5 text-[12px] leading-relaxed text-muted">
-              A clock on Earth and a clock in the crew cabin run at different rates. Guess both
-              durations — the answer is revealed on arrival.
+            <p className="mt-1.5 text-[12px] leading-relaxed text-ink/60">
+              A clock at {origin.name} and a clock in the crew cabin run at different rates. Guess
+              both durations — the answer is revealed on arrival.
             </p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div>
-                <label htmlFor="predict-earth" className="mb-1 block text-[10px] tracking-[0.14em] text-muted uppercase">
-                  Earth years
+                <label htmlFor="predict-earth" className="mb-1 block text-[10px] tracking-[0.14em] text-ink/50 uppercase">
+                  Reference years
                 </label>
                 <input
                   id="predict-earth"
@@ -171,7 +182,7 @@ export default function FlightPlan({
                 />
               </div>
               <div>
-                <label htmlFor="predict-ship" className="mb-1 block text-[10px] tracking-[0.14em] text-muted uppercase">
+                <label htmlFor="predict-ship" className="mb-1 block text-[10px] tracking-[0.14em] text-ink/50 uppercase">
                   Ship years
                 </label>
                 <input
@@ -187,7 +198,7 @@ export default function FlightPlan({
               </div>
             </div>
 
-            <p className="mt-3 text-[10px] text-muted/80">
+            <p className="mt-3 text-[10px] text-ink/40">
               Optional — launch without a prediction and the debrief still shows the physics.
             </p>
           </div>
@@ -195,19 +206,29 @@ export default function FlightPlan({
           <div className="panel p-5 sm:p-6">
             <dl className="space-y-2 text-[12px]">
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-muted">Destination</dt>
+                <dt className="text-ink/55">Departure</dt>
+                <dd className="text-right text-ink">{origin.name}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-ink/55">Destination</dt>
                 <dd className="text-right text-ink">{planet.name}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-muted">Distance</dt>
-                <dd className="num text-right text-ink">{formatNumber(planet.distanceLy, 2)} ly</dd>
+                <dt className="text-ink/55">Distance</dt>
+                <dd className="num text-right text-ink">
+                  {formatNumber(distanceLy, distanceLy < 1 ? 5 : 2)} ly
+                </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-muted">Cruise speed</dt>
+                <dt className="text-ink/55">Cruise speed</dt>
                 <dd className="num text-right text-ink">{beta.toFixed(3)} c</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-muted">World type</dt>
+                <dt className="text-ink/55">Light-travel time</dt>
+                <dd className="num text-right text-ink">{formatYears(distanceLy)}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-ink/55">World type</dt>
                 <dd className="text-right text-ink/85">{look.label}</dd>
               </div>
             </dl>
