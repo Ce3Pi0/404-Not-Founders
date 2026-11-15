@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber'
 import BobbleFigure from './BobbleFigure'
 import { describeAge } from '../lib/aging'
 import { classifyPlanet } from '../lib/planet'
+import { isSolarWorld } from '../lib/catalog'
 import { formatYears } from '../lib/physics'
 
 function Caption({ name, tone, described, note }) {
@@ -21,7 +22,8 @@ export default function CrewLineup({ planet, sim, shipName }) {
   const astronaut = describeAge(sim.shipYears)
   const twin = describeAge(sim.earthYears)
   const alien = describeAge(sim.earthYears)
-  const showAlien = planet.kind !== 'earth'
+  // The alien is an exoplanet local: no locals anywhere in our own system.
+  const showAlien = !isSolarWorld(planet)
 
   return (
     <section className="panel p-5">

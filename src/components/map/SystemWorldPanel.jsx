@@ -1,3 +1,4 @@
+import { isSolarWorld } from '../../lib/catalog'
 import { classifyPlanet, describeStar } from '../../lib/planet'
 import { formatNumber } from '../../lib/physics'
 import { formatAu } from '../../lib/planetSystem'
@@ -40,7 +41,11 @@ export default function SystemWorldPanel({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[9px] tracking-[0.18em] text-ink/45 uppercase">
-                {selectedPlanet.kind === 'earth' ? 'Home world' : 'Exoplanet'}
+                {selectedPlanet.kind === 'earth'
+                  ? 'Home world'
+                  : isSolarWorld(selectedPlanet)
+                    ? 'Solar System world'
+                    : 'Exoplanet'}
               </div>
               <h2 className="mt-1 truncate text-lg leading-tight font-semibold">
                 {selectedPlanet.name}
@@ -86,11 +91,13 @@ export default function SystemWorldPanel({
               note={selectedPlanet.bulkEstimated ? 'estimated bulk' : undefined}
             />
             <Stat
-              label="Equilibrium"
+              label={selectedPlanet.eqTempK == null ? 'Mean temp' : 'Equilibrium'}
               value={
-                selectedPlanet.eqTempK == null
-                  ? '—'
-                  : `${formatNumber(selectedPlanet.eqTempK, 0)} K`
+                selectedPlanet.eqTempK != null
+                  ? `${formatNumber(selectedPlanet.eqTempK, 0)} K`
+                  : selectedPlanet.meanTempK == null
+                    ? '—'
+                    : `${formatNumber(selectedPlanet.meanTempK, 0)} K`
               }
             />
             <Stat label="Host star" value={star?.spectral ?? '—'} />
@@ -126,9 +133,11 @@ export default function SystemWorldPanel({
           </div>
 
           <p className="text-[9px] leading-relaxed text-ink/40">
-            Surface texture and colour are a visual interpretation generated from bulk estimates —
-            not real imagery. Orbits are circular, at the archive's semi-major axis, with
-            illustrative starting phases: not a present-day ephemeris.
+            {selectedPlanet.kind === 'earth'
+              ? 'Earth is drawn from NASA Blue Marble imagery.'
+              : 'Surface texture and colour are a visual interpretation generated from bulk estimates — not real imagery.'}{' '}
+            Orbits are circular, at the archive's semi-major axis, with illustrative starting
+            phases: not a present-day ephemeris.
           </p>
         </>
       ) : (

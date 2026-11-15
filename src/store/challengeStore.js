@@ -10,6 +10,7 @@ import { useMemo } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { buildDirectReturnLeg, buildExpeditionRoute } from '../lib/challenge/route'
+import { isSolarWorld } from '../lib/catalog'
 import { clampBeta } from '../lib/challenge/physics'
 import { readPhysicsConfig } from '../lib/mission'
 import { usePhysicsStore } from './physicsStore'
@@ -107,7 +108,7 @@ export const useChallengeStore = create(
       /* ------------------------------------------------------------ route -- */
 
       addPlanet(planet) {
-        if (!planet || planet.kind === 'earth') return
+        if (!planet || isSolarWorld(planet)) return
         set((state) => {
           if (state.planetIds.includes(planet.id)) return state
           return { planetIds: [...state.planetIds, planet.id] }

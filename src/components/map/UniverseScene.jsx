@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { mulberry32 } from '../../lib/planet'
+import { mulberry32, starColor } from '../../lib/planet'
 import { SOLAR_SYSTEM } from '../../lib/starMap'
 import { HAS_WEBGL } from '../../lib/webgl'
 import { createGlowTexture, createHaloTexture } from '../../lib/glowTexture'
+import { createZoomOutLatch, wheelPixels } from '../../lib/zoomTransition'
 
 import { HOME_CAMERA, HOME_TARGET, EARTH_RETURN_DISTANCE } from '../../lib/mapCamera'
 /** Cyan is the map's signature accent for the inspected system. */
@@ -50,9 +51,12 @@ function HostStars({ systems, glow }) {
     const color = new THREE.Color()
     systems.forEach((system, index) => {
       positions.set(system.renderPosition, index * 3)
-      // Palette only: multi-planet systems glow brighter than single-planet ones.
-      color.set(system.planets.length > 1 ? '#9a0680' : '#79018c')
-      colors.set([color.r, color.g, color.b], index * 3)
+      // Each point takes its host star's blackbody colour, so the map reads as
+      // a real sky: blue-white hot stars through yellow, orange and red dwarfs.
+      // Systems with several known worlds glow a little brighter, never purple.
+      color.set(starColor(system.planets[0]?.starTeffK))
+      const brightness = system.planets.length > 1 ? 1 : 0.78
+      colors.set([color.r * brightness, color.g * brightness, color.b * brightness], index * 3)
     })
     const buffer = new THREE.BufferGeometry()
     buffer.setAttribute('position', new THREE.BufferAttribute(positions, 3))
@@ -187,7 +191,7 @@ function ExpeditionPath({ segments }) {
   )
 }
 
-/** Solar System: a distinct glowing origin with a mapped reference ring. */
+/** Solar System: a distinct glowing origin. */
 function SolarOrigin({ glow }) {
   const [x, y, z] = SOLAR_SYSTEM.renderPosition
   return (
@@ -202,26 +206,6 @@ function SolarOrigin({ glow }) {
           blending={THREE.AdditiveBlending}
         />
       </sprite>
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[1.5, 1.6, 72]} />
-        <meshBasicMaterial
-          color="#9a0680"
-          transparent
-          opacity={0.55}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-        />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[2.6, 2.64, 72]} />
-        <meshBasicMaterial
-          color="#79018c"
-          transparent
-          opacity={0.28}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-        />
-      </mesh>
       <mesh>
         <sphereGeometry args={[0.08, 12, 12]} />
         <meshBasicMaterial color="#ffffff" />
@@ -236,6 +220,9 @@ function StarField({ glow }) {
     const random = mulberry32(20261115)
     const count = 1600
     const positions = new Float32Array(count * 3)
+    const colors = new Float32Array(count * 3)
+    const palette = ['#ffffff', '#dbe9ff', '#b9d0ff', '#ffe8c2', '#ffc79a', '#ff9f7e']
+    const tint = new THREE.Color()
     for (let i = 0; i < count; i += 1) {
       const u = random() * 2 - 1
       const theta = random() * Math.PI * 2
@@ -244,9 +231,13 @@ function StarField({ glow }) {
       positions[i * 3] = Math.cos(theta) * ring * radius
       positions[i * 3 + 1] = u * radius
       positions[i * 3 + 2] = Math.sin(theta) * ring * radius
+      tint.set(palette[Math.floor(random() * palette.length)])
+      const brightness = 0.45 + random() * 0.55
+      colors.set([tint.r * brightness, tint.g * brightness, tint.b * brightness], i * 3)
     }
     const buffer = new THREE.BufferGeometry()
     buffer.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    buffer.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     return buffer
   }, [])
 
@@ -256,9 +247,9 @@ function StarField({ glow }) {
         map={glow}
         size={2.2}
         sizeAttenuation={false}
-        color="#ffffff"
+        vertexColors
         transparent
-        opacity={0.3}
+        opacity={0.35}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
       />
@@ -501,11 +492,26 @@ function SceneRig({
   const controls = useMemo(() => new OrbitControls(camera, gl.domElement), [camera, gl])
   const projection = useMemo(() => new THREE.Vector3(), [])
   const approachArmed = useRef(false)
+  const approachHandler = useRef(onApproachOrigin)
+  approachHandler.current = onApproachOrigin
   const hoverAt = useRef(0)
   const tween = useRef(null)
   const firstReset = useRef(true)
   const firstView = useRef(true)
   const haloTexture = useMemo(createHaloTexture, [])
+  const viewDirection = useMemo(() => new THREE.Vector3(), [])
+  const originDirection = useMemo(() => new THREE.Vector3(), [])
+
+  /** True while the camera sits close to, and looks straight at, the Solar origin. */
+  const aimedAtOrigin = useCallback(
+    (toleranceDeg) => {
+      if (camera.position.lengthSq() < 1e-6) return true
+      camera.getWorldDirection(viewDirection)
+      originDirection.copy(camera.position).multiplyScalar(-1).normalize()
+      return viewDirection.angleTo(originDirection) < THREE.MathUtils.degToRad(toleranceDeg)
+    },
+    [camera, originDirection, viewDirection],
+  )
 
   useEffect(() => {
     controls.enableDamping = true
@@ -596,21 +602,43 @@ function SceneRig({
     )
   }, [camera, controls, focus])
 
-  /** Any manual camera input interrupts the flight — never fight the user. */
+  /**
+   * Any manual camera input interrupts the flight — never fight the user.
+   * Wheeling further in once the Solar System fills the view is also the
+   * gesture that enters Earth orbit, which makes the handoff reliable even
+   * when the orbit target stopped slightly short of the exact origin.
+   */
   useEffect(() => {
     const element = gl.domElement
     const interrupt = () => {
       tween.current = null
     }
+    // Inward wheel travel, normalised across wheel units, earns the handoff
+    // once the Solar origin fills the view (lib/zoomTransition.js).
+    const latch = createZoomOutLatch()
+    const handleWheel = (event) => {
+      tween.current = null
+      const handler = approachHandler.current
+      if (!handler || !approachArmed.current) {
+        latch.reset()
+        return
+      }
+      const distance = camera.position.length()
+      const ready = distance <= EARTH_RETURN_DISTANCE * 4 && aimedAtOrigin(14)
+      if (latch.push(-wheelPixels(event), ready)) {
+        approachArmed.current = false
+        handler()
+      }
+    }
     element.addEventListener('pointerdown', interrupt)
-    element.addEventListener('wheel', interrupt, { passive: true })
     element.addEventListener('touchstart', interrupt, { passive: true })
+    element.addEventListener('wheel', handleWheel, { passive: true })
     return () => {
       element.removeEventListener('pointerdown', interrupt)
-      element.removeEventListener('wheel', interrupt)
       element.removeEventListener('touchstart', interrupt)
+      element.removeEventListener('wheel', handleWheel)
     }
-  }, [gl])
+  }, [aimedAtOrigin, camera, gl])
 
   /** Screen-space picking keeps clicks on the drawing, not on a wire sphere. */
   const pick = useCallback(
@@ -706,16 +734,17 @@ function SceneRig({
      * camera is back inside the Solar System, hand the view back to the orbit
      * scene. Arming at a real distance keeps the arrival flight from firing it.
      */
-    if (onApproachOrigin) {
+    const approach = approachHandler.current
+    if (approach) {
       const distance = camera.position.length()
       if (distance > 8) approachArmed.current = true
       if (
         approachArmed.current &&
         distance < EARTH_RETURN_DISTANCE &&
-        controls.target.length() < 1.4
+        aimedAtOrigin(20)
       ) {
         approachArmed.current = false
-        onApproachOrigin()
+        approach()
       }
     }
 
@@ -799,11 +828,11 @@ function SceneRig({
 
   return (
     <>
-      <color attach="background" args={['#160040']} />
+      <color attach="background" args={['#000000']} />
       <ambientLight intensity={0.8} />
       <StarField glow={glow} />
       <HostStars systems={systems} glow={glow} />
-      <MarkerPoints entries={hoveredEntries} glow={glow} color="#c084fc" size={14} />
+      <MarkerPoints entries={hoveredEntries} glow={glow} color="#ffd27a" size={14} />
       <MarkerPoints entries={selectedEntries} glow={glow} color={CYAN} size={16} />
       {selected && <SelectedHalo entry={selected} haloTexture={haloTexture} glow={glow} />}
       <SolarOrigin glow={glow} />

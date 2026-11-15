@@ -1,5 +1,7 @@
 import csvText from "../data/exoplanets.csv?raw";
+import solarBodies from "../data/solarSystem.json";
 import { hashString, mulberry32 } from "./planet";
+import { SOLAR_PLANET_ORDER, SOLAR_SYSTEM_NAME, buildSolarPlanets } from "./solarSystem";
 
 export const LY_PER_PC = 3.26156;
 export const LY_PER_AU = 1 / 63241.077;
@@ -170,7 +172,17 @@ function deriveBulk(name, eqTempK) {
   };
 }
 
-export const EARTH = {
+/**
+ * The Solar System extract (`solarSystem.json`, from the Solar System OpenData
+ * API) is normalised by lib/solarSystem.js into the same record shape the CSV
+ * rows get. It is a *second* dataset, not a replacement: the exoplanet CSV's
+ * interpretation above is untouched.
+ */
+const SOLAR_PLANETS = buildSolarPlanets(solarBodies?.bodies ?? []);
+const SOLAR_BY_ID = new Map(SOLAR_PLANETS.map((planet) => [planet.id, planet]));
+const SUN_EARTH = SOLAR_BY_ID.get("earth") ?? null;
+
+const EARTH_BASE = {
   id: "earth",
   name: "Earth",
   star: "Solar System",
@@ -196,6 +208,56 @@ export const EARTH = {
   starLuminositySun: 1,
   position: [0, 0, 0],
 };
+
+/**
+ * Earth keeps every reference constant above — it is the unit the whole app
+ * measures against. The extract only contributes observed extras (axial tilt,
+ * escape velocity, perihelion, mean surface temperature…), so there is never a
+ * second Earth record: `earth` is one object, enriched in place.
+ */
+const EARTH_DEFINING_KEYS = new Set([
+  "id",
+  "name",
+  "star",
+  "kind",
+  "distancePc",
+  "distanceLy",
+  "distanceKnown",
+  "ra",
+  "dec",
+  "position",
+  "semiMajorAxisAu",
+  "orbitalPeriodDays",
+  "massEarth",
+  "radiusEarth",
+  "massEarthMeasured",
+  "radiusEarthMeasured",
+  "massSource",
+  "massIsMinimum",
+  "densityGcc",
+  "eqTempK",
+  "starMassSun",
+  "starRadiusSun",
+  "starTeffK",
+  "starLuminositySun",
+]);
+
+const EARTH_OBSERVED = SUN_EARTH
+  ? Object.fromEntries(
+      Object.entries(SUN_EARTH).filter(([key]) => !EARTH_DEFINING_KEYS.has(key)),
+    )
+  : {};
+
+export const EARTH = { ...EARTH_BASE, ...EARTH_OBSERVED };
+
+/** Every Solar System world, innermost first — Earth included exactly once. */
+export const SOLAR_WORLDS = SOLAR_PLANET_ORDER.map((id) =>
+  id === "earth" ? EARTH : (SOLAR_BY_ID.get(id) ?? null),
+).filter(Boolean);
+
+/** True for any world orbiting the Sun — Earth included. */
+export const isSolarWorld = (planet) =>
+  Boolean(planet) && planet.star === SOLAR_SYSTEM_NAME;
 
 const EXOPLANETS = lines
   .filter((line) => cell(line, "pl_name") && cell(line, "hostname"))
@@ -254,7 +316,7 @@ const EXOPLANETS = lines
     };
   });
 
-export const PLANETS = [EARTH, ...EXOPLANETS];
+export const PLANETS = [...SOLAR_WORLDS, ...EXOPLANETS];
 export const BY_ID = new Map(PLANETS.map((planet) => [planet.id, planet]));
 export const BY_NAME = new Map(PLANETS.map((planet) => [planet.name, planet]));
 
@@ -288,8 +350,8 @@ export const SYSTEMS = (() => {
       });
     }
   }
-  map.set("Solar System", {
-    name: "Solar System",
+  map.set(SOLAR_SYSTEM_NAME, {
+    name: SOLAR_SYSTEM_NAME,
     position: [0, 0, 0],
     distancePc: 0,
     distanceLy: 0,
@@ -297,7 +359,8 @@ export const SYSTEMS = (() => {
     mapPosition: [0, 0, 0],
     ra: 0,
     dec: 0,
-    planets: [EARTH],
+    // All eight planets, so `/system/solar-system` is the whole Solar System.
+    planets: SOLAR_WORLDS,
   });
   return map;
 })();

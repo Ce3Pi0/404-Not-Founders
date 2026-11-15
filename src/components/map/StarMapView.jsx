@@ -178,8 +178,8 @@ export default function StarMapView({
   }
 
   return (
-    <section className="screen panel overflow-hidden">
-      <div className="relative h-[74vh] min-h-[560px] w-full">
+    <section className="screen panel overflow-hidden bg-black">
+      <div className="relative h-[74vh] min-h-[560px] w-full bg-black">
         <UniverseScene
           systems={REGION_SYSTEMS}
           pickTargets={PICK_TARGETS}
@@ -233,6 +233,14 @@ export default function StarMapView({
                       {formatNumber(entry.distanceLy, 1)} ly
                     </span>
                   )}
+                  {hovered?.name === entry.name && (
+                    <span className="ml-1 text-[9px] text-[#ffd27a]/85">
+                      {' '}
+                      {entryIsSolar(entry) || entry.planets.length > 1
+                        ? 'several worlds'
+                        : 'single world'}
+                    </span>
+                  )}
                 </button>
               </div>
             )
@@ -240,7 +248,7 @@ export default function StarMapView({
         </div>
 
         {/* search, region and legend */}
-        <div className="absolute top-3 left-3 z-20 w-[300px] space-y-2">
+        <div className="absolute top-3 left-3 z-20 w-[300px] space-y-2 max-lg:w-[calc(100%-6.75rem)] max-lg:max-w-[300px]">
           <MapSearch originEntry={originEntry} onPick={handleSearchPick} />
 
           <div className="pointer-events-none rounded-xl border border-line/50 bg-void/85 px-3 py-2.5 backdrop-blur">
@@ -276,51 +284,60 @@ export default function StarMapView({
               <span className="h-1.5 w-1.5 rounded-full bg-white" /> Solar System
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-ion" /> several worlds
+              <span className="h-1.5 w-1.5 rounded-full bg-[#b9d0ff]" /> hot star
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-line" /> single world
+              <span className="h-1.5 w-1.5 rounded-full bg-[#ffc79a]" /> cool star
             </span>
+            <span className="text-ink/45">hover a star for its worlds</span>
           </div>
         </div>
 
-        {/* controls */}
-        <div className="pointer-events-auto absolute top-3 right-3 z-20 flex gap-2">
+        {/* controls — a compact rail on narrow screens so it never meets the search box */}
+        <div className="pointer-events-auto absolute top-3 right-3 z-20 flex flex-col items-end gap-1.5 lg:flex-row lg:items-center lg:gap-2">
           {onStartChallenge && (
             <button
               type="button"
-              className="btn border-[#5ee7ff]/60 bg-[#5ee7ff]/12 px-3 py-1.5 text-[11px] text-[#c9f7ff] hover:border-[#5ee7ff]"
+              className="btn border-[#5ee7ff]/60 bg-[#5ee7ff]/12 px-2 py-1.5 text-[10px] whitespace-nowrap text-[#c9f7ff] hover:border-[#5ee7ff] lg:px-3 lg:text-[11px]"
               onClick={onStartChallenge}
               data-testid="start-expedition-challenge-map"
             >
-              Start expedition challenge →
+              <span className="lg:hidden">Challenge →</span>
+              <span className="hidden lg:inline">Start expedition challenge →</span>
             </button>
           )}
           <button
             type="button"
-            className="btn bg-void/80 px-3 py-1.5 text-[11px]"
+            className="btn bg-void/80 px-2 py-1.5 text-[10px] whitespace-nowrap lg:px-3 lg:text-[11px]"
             onClick={() => setResetSignal((value) => value + 1)}
           >
-            Reset camera
+            <span className="lg:hidden">Reset</span>
+            <span className="hidden lg:inline">Reset camera</span>
           </button>
           {onReturnToEarth && (
             <button
               type="button"
-              className="btn bg-void/80 px-3 py-1.5 text-[11px]"
+              className="btn bg-void/80 px-2 py-1.5 text-[10px] whitespace-nowrap lg:px-3 lg:text-[11px]"
               onClick={onReturnToEarth}
               data-testid="return-to-earth-orbit"
             >
-              Return to Earth
+              <span className="lg:hidden">Earth</span>
+              <span className="hidden lg:inline">Return to Earth</span>
             </button>
           )}
-          <button type="button" className="btn bg-void/80 px-3 py-1.5 text-[11px]" onClick={onExit}>
-            Close map
+          <button
+            type="button"
+            className="btn bg-void/80 px-2 py-1.5 text-[10px] whitespace-nowrap lg:px-3 lg:text-[11px]"
+            onClick={onExit}
+          >
+            <span className="lg:hidden">Close</span>
+            <span className="hidden lg:inline">Close map</span>
           </button>
         </div>
 
         {/* selected system */}
         {selected && (
-          <div className="pointer-events-none absolute top-[60px] right-3 z-20 max-h-[calc(100%-180px)] w-[318px] max-md:inset-x-3 max-md:top-auto max-md:bottom-3 max-md:w-auto max-md:max-h-[52%]">
+          <div className="pointer-events-none absolute top-[60px] right-3 z-30 max-h-[calc(100%-180px)] w-[318px] max-lg:inset-x-3 max-lg:top-auto max-lg:bottom-3 max-lg:w-auto max-lg:max-h-[52%]">
             <SystemPanel
               entry={selected}
               activePlanet={activePlanet}

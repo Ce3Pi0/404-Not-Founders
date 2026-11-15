@@ -40,6 +40,7 @@ export default function Header({
   onAbout,
   onReset,
   onSelectStep,
+  canDebrief = false,
   inMap = false,
   onOpenMap,
 }) {
@@ -64,13 +65,18 @@ export default function Header({
           {STEPS.map((entry, index) => {
             const active = entry.id === step
             const passed = STEPS.findIndex((s) => s.id === step) > index
+            // The debrief reports elapsed mission time, so it only unlocks
+            // after the flight has actually arrived.
+            const locked = entry.id === 'debrief' && !canDebrief
             return (
               <button
                 type="button"
                 onClick={() => onSelectStep?.(entry.id)}
                 key={entry.id}
+                disabled={locked}
+                title={locked ? 'Available once the flight arrives' : undefined}
                 aria-current={active ? 'step' : undefined}
-                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] tracking-[0.12em] uppercase transition hover:bg-ion/50 hover:cursor-pointer ${active ? 'bg-ion! text-white' : passed ? 'text-ink/70' : 'text-ink/40'
+                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] tracking-[0.12em] uppercase transition hover:bg-ion/50 hover:cursor-pointer disabled:pointer-events-none disabled:opacity-35 ${active ? 'bg-ion! text-white' : passed ? 'text-ink/70' : 'text-ink/40'
                   }`}
               >
                 <span

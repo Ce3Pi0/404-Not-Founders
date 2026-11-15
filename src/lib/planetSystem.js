@@ -80,6 +80,21 @@ export function buildPlanetSystem(entry) {
   const reference = entry.planets[0] ?? placed[0]
   const starRadiusSun = reference?.starRadiusSun ?? 1
 
+  // Separation between neighbouring orbits. The Solar System spans 0.39 to 30 AU,
+  // so a size based on the outermost orbit alone would draw a Sun wider than
+  // Mercury's orbit — every drawn size below is capped by the room a body
+  // actually has, never by the system's overall extent.
+  const gapBefore = (index) =>
+    index === 0
+      ? (placed[0]?.semiMajorAxisAu ?? 0)
+      : placed[index].semiMajorAxisAu - placed[index - 1].semiMajorAxisAu
+  const gapAfter = (index) =>
+    index === placed.length - 1
+      ? (placed[index]?.semiMajorAxisAu ?? 0)
+      : placed[index + 1].semiMajorAxisAu - placed[index].semiMajorAxisAu
+  const spacingFor = (index) => Math.max(0, Math.min(gapBefore(index), gapAfter(index)))
+  const innermostAu = placed[0]?.semiMajorAxisAu ?? extentAu
+
   const star = {
     name: entry.name,
     color: starColor(reference?.starTeffK),
@@ -88,11 +103,15 @@ export function buildPlanetSystem(entry) {
     massSun: reference?.starMassSun ?? null,
     luminositySun: reference?.starLuminositySun ?? null,
     // Drawn radius: exaggerated (a real star is ~0.005 AU), but still scaled by
-    // the derived stellar radius so a giant reads larger than a red dwarf.
-    units: clamp(extentAu * 0.06 * Math.sqrt(starRadiusSun), extentAu * 0.03, extentAu * 0.1),
+    // the derived stellar radius so a giant reads larger than a red dwarf, and
+    // capped so it can never swallow the innermost orbit.
+    units: Math.min(
+      clamp(extentAu * 0.06 * Math.sqrt(starRadiusSun), extentAu * 0.03, extentAu * 0.1),
+      Math.max(extentAu * 0.002, innermostAu * 0.35),
+    ),
   }
 
-  const bodies = placed.map((planet) => {
+  const bodies = placed.map((planet, index) => {
     const rand = mulberry32(hashString(`${planet.name}-orbit-phase`))
     const periodDays =
       planet.orbitalPeriodDays != null && planet.orbitalPeriodDays > 0
@@ -105,11 +124,16 @@ export function buildPlanetSystem(entry) {
       orbitAu: planet.semiMajorAxisAu,
       orbitUnits: planet.semiMajorAxisAu * AU_PER_UNIT,
       radiusEarth,
-      // Exaggerated draw radius (relative size follows √radius estimate).
-      radiusUnits: clamp(
-        extentAu * 0.04 * Math.sqrt(Math.max(0.35, radiusEarth)),
-        extentAu * 0.016,
-        extentAu * 0.08,
+      // Exaggerated draw radius (relative size follows √radius estimate), capped
+      // by the gap to its neighbours so two orbits never touch on screen. Both
+      // numbers are illustrative: the orbital radius stays the archive's value.
+      radiusUnits: Math.min(
+        clamp(
+          extentAu * 0.04 * Math.sqrt(Math.max(0.35, radiusEarth)),
+          extentAu * 0.016,
+          extentAu * 0.08,
+        ),
+        Math.max(extentAu * 0.0012, spacingFor(index) * 0.28),
       ),
       periodDays,
       angularSpeed: periodDays ? TAU / periodDays : 0,

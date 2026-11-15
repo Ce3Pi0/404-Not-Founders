@@ -6,7 +6,11 @@ import EarthDossier from './EarthDossier'
  * "Explore the universe" hands off to the real 3D star map — the same map the
  * header button and the route planner open — so there is one star map, not two.
  */
-export default function EarthOrbitHero({ onExploreUniverse, onStartChallenge, onPlanRoute }) {
+export default function EarthOrbitHero({
+  onExploreUniverse,
+  onStartChallenge,
+  onPlanRoute,
+}) {
   return (
     <section
       className="screen panel relative overflow-hidden"
@@ -70,8 +74,10 @@ export default function EarthOrbitHero({ onExploreUniverse, onStartChallenge, on
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-white/45">
-              <span>Drag to orbit · scroll to zoom</span>
-              <span className="hidden sm:inline">Scroll out past the limit for the star map</span>
+              <span>Drag to orbit · scroll to zoom · the Sun sits 1 AU out</span>
+              <span className="hidden sm:inline">
+                Click the scene, then scroll out past the limit for the star map
+              </span>
               {onPlanRoute && (
                 <button
                   type="button"

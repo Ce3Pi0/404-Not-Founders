@@ -1,4 +1,5 @@
 import PlanetPortrait from './PlanetPortrait'
+import { isSolarWorld } from '../lib/catalog'
 import { classifyPlanet, describeStar } from '../lib/planet'
 import { formatNumber } from '../lib/physics'
 import { formatAu } from '../lib/planetSystem'
@@ -53,7 +54,11 @@ export default function PlanetDetailView({
           </h1>
           <p className="mt-1 text-[11px] text-ink/65">
             {star.name} · {star.spectral}
-            {!isEarth && ` · ${formatNumber(planet.distanceLy, 2)} ly from Earth`}
+            {isEarth && ' · home world'}
+            {!isEarth &&
+              (isSolarWorld(planet)
+                ? ` · ${formatAu(planet.semiMajorAxisAu)} from the Sun`
+                : ` · ${formatNumber(planet.distanceLy, 2)} ly from Earth`)}
           </p>
         </div>
 
@@ -89,7 +94,7 @@ export default function PlanetDetailView({
 
         <div className="panel p-4">
           <div className="text-[9px] tracking-[0.16em] text-ink/45 uppercase">
-            NASA Exoplanet Archive
+            {planet.dataSource ?? 'NASA Exoplanet Archive'}
           </div>
 
           {!orbitKnown && (
@@ -130,9 +135,21 @@ export default function PlanetDetailView({
               note={planet.bulkEstimated ? 'estimated' : undefined}
             />
             <Stat
-              label="Equilibrium"
-              value={planet.eqTempK == null ? '—' : `${formatNumber(planet.eqTempK, 0)} K`}
+              label={planet.eqTempK == null ? 'Mean temp' : 'Equilibrium'}
+              value={
+                planet.eqTempK != null
+                  ? `${formatNumber(planet.eqTempK, 0)} K`
+                  : planet.meanTempK == null
+                    ? '—'
+                    : `${formatNumber(planet.meanTempK, 0)} K`
+              }
             />
+            {planet.axialTiltDeg != null && (
+              <Stat label="Axial tilt" value={`${formatNumber(planet.axialTiltDeg, 2)}°`} />
+            )}
+            {planet.surfaceGravityMs2 != null && (
+              <Stat label="Surface gravity" value={`${formatNumber(planet.surfaceGravityMs2, 2)} m/s²`} />
+            )}
             <Stat label="Host star" value={star.spectral} />
             <Stat
               label="Star temperature"
@@ -157,9 +174,9 @@ export default function PlanetDetailView({
           </div>
 
           <p className="mt-3 text-[10px] leading-relaxed text-ink/45">
-            Orbital columns come from the NASA extract. Radius, mass, density and temperature are
-            derived or estimated, and the surface texture is an artistic interpretation — this page
-            does not claim a present-day position without orbital epoch and phase data.
+            {isSolarWorld(planet)
+              ? 'Orbital and physical columns are the measured Solar System OpenData values. The surface texture is an artistic interpretation, and the orbital phase is illustrative — this page does not claim a present-day position.'
+              : 'Orbital columns come from the NASA extract. Radius, mass, density and temperature are derived or estimated, and the surface texture is an artistic interpretation — this page does not claim a present-day position without orbital epoch and phase data.'}
           </p>
 
           <div className="mt-3 flex flex-wrap gap-2">

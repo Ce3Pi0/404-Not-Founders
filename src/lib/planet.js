@@ -150,6 +150,13 @@ export function classifyPlanet(planet) {
     type = 'desert'
   }
 
+  // Solar System worlds have an observed surface class (solarSystem.js), which
+  // beats anything inferred from bulk estimates — Mars is never a water world.
+  if (planet.surfaceType && TYPES[planet.surfaceType]) {
+    type = planet.surfaceType
+    source = 'observed'
+  }
+
   if (source !== 'random' && planet.bulkEstimated) source = 'estimated'
 
   const definition = TYPES[type]
@@ -172,7 +179,9 @@ export function classifyPlanet(planet) {
     evidence:
       source === 'random'
         ? 'No orbital data in the archive — appearance randomized.'
-        : `Estimated from the archive's orbital data — ${evidence.join(', ')}.`,
+        : source === 'observed'
+          ? 'Observed surface class from the Solar System OpenData record.'
+          : `Estimated from the archive's orbital data — ${evidence.join(', ')}.`,
   }
 }
 

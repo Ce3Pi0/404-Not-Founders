@@ -1,4 +1,4 @@
-import { memo, Suspense, useEffect, useMemo, useRef } from 'react'
+import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -8,6 +8,8 @@ import earthSpecularMap from '../../assets/earth/earth_specular_2048.jpg'
 import earthCloudMap from '../../assets/earth/earth_clouds_1024.png'
 import { MAPPED_SYSTEMS } from '../../lib/catalog'
 import { mulberry32, starColor } from '../../lib/planet'
+import { thinSkyStars } from '../../lib/skyStars'
+import { createZoomOutLatch, wheelPixels } from '../../lib/zoomTransition'
 import { createGlowTexture } from '../../lib/glowTexture'
 import { HAS_WEBGL } from '../../lib/webgl'
 import Spacecraft from '../lab/Spacecraft'
@@ -22,10 +24,54 @@ import Spacecraft from '../lab/Spacecraft'
  */
 
 const EARTH_TILT = THREE.MathUtils.degToRad(23.4)
-/** One direction for sunlight, atmosphere rim and shadow, so they agree. */
-const SUN_DIRECTION = new THREE.Vector3(-0.72, 0.3, 0.42).normalize()
 const SUN_COLOR = '#fff3e2'
 const SPACE = '#04010c'
+
+/**
+ * The orbit scene is Earth drawn from just above the atmosphere with the Sun
+ * beyond it — nothing else. The other Solar System worlds belong to the star
+ * map, the Solar System view and the travel planner, not to this close-up.
+ * The Sun's sky angle is measured from the opening camera, so it opens just past
+ * Earth's limb in the direction the key light actually comes from.
+ */
+const HOME_CAMERA = new THREE.Vector3(2.3, 1.5, 5.9)
+const VIEW_AXIS = HOME_CAMERA.clone().negate().normalize()
+const SCREEN_RIGHT = new THREE.Vector3()
+  .crossVectors(VIEW_AXIS, new THREE.Vector3(0, 1, 0))
+  .normalize()
+const SCREEN_UP = new THREE.Vector3().crossVectors(SCREEN_RIGHT, VIEW_AXIS).normalize()
+
+/** Direction to a point at a given horizontal / vertical screen angle. */
+function skyDirection(horizontalDeg, verticalDeg) {
+  return VIEW_AXIS.clone()
+    .add(SCREEN_RIGHT.clone().multiplyScalar(Math.tan(THREE.MathUtils.degToRad(horizontalDeg))))
+    .add(SCREEN_UP.clone().multiplyScalar(Math.tan(THREE.MathUtils.degToRad(verticalDeg))))
+    .normalize()
+}
+
+const SUN_HORIZONTAL_DEG = 14
+const SUN_VERTICAL_DEG = 12
+const SUN_DIRECTION = skyDirection(SUN_HORIZONTAL_DEG, SUN_VERTICAL_DEG)
+
+/**
+ * Earth-view Sun scale.
+ *
+ * The scene is drawn in Earth radii (1 unit = 6,371 km) so Earth's surface keeps
+ * its float precision. At that scale the Sun's real geometry is unusable from
+ * this close-up: 23,481 Earth radii away (far outside the camera's far plane)
+ * with a 109 Earth-radius disc. So the Earth view keeps the Sun's *real angular
+ * size* rather than its real proportions — it sits at a fixed, far sky distance
+ * and its radius is derived from the 0.53° disc the Sun actually subtends from
+ * Earth. Parallax across the whole orbit camera range (2.35–10 units) is under
+ * half a percent, so it reads as a distant star and never as a nearby prop.
+ * Sunlight still arrives along the same direction, so Earth's shading is
+ * unchanged. The Solar System view keeps its own scale, untouched.
+ */
+const SUN_ANGULAR_DIAMETER_DEG = 0.53
+const SUN_VIEW_DISTANCE = 1500
+const SUN_VIEW_RADIUS =
+  SUN_VIEW_DISTANCE * Math.tan(THREE.MathUtils.degToRad(SUN_ANGULAR_DIAMETER_DEG / 2))
+const SUN_POSITION = SUN_DIRECTION.clone().multiplyScalar(SUN_VIEW_DISTANCE)
 
 /* --------------------------------------------------------------- textures -- */
 
@@ -77,8 +123,9 @@ function MilkyWay() {
   const texture = useMemo(createMilkyWayTexture, [])
   useEffect(() => () => texture.dispose(), [texture])
 
+  // The backdrop sits beyond the Sun's 1,500-unit sky distance.
   return (
-    <mesh rotation={[0.62, 1.15, 0.22]} scale={260}>
+    <mesh rotation={[0.62, 1.15, 0.22]} scale={2600}>
       <sphereGeometry args={[1, 48, 48]} />
       <meshBasicMaterial
         map={texture}
@@ -97,11 +144,14 @@ function MilkyWay() {
 /**
  * Background stars. The brighter layer uses each catalogue system's real
  * direction (its RA/Dec position projected onto the sky sphere); the dimmer
- * layer is procedural filler, illustrative only.
+ * layer is procedural filler, illustrative only. The thicker catalogue is
+ * thinned on the sky first — see lib/skyStars.js for why.
  */
 function StarField({ glow }) {
   const catalog = useMemo(() => {
-    const systems = MAPPED_SYSTEMS.filter((system) => system.mapPosition && system.distanceLy > 0)
+    const systems = thinSkyStars(
+      MAPPED_SYSTEMS.filter((system) => system.mapPosition && system.distanceLy > 0),
+    )
     const positions = new Float32Array(systems.length * 3)
     const colors = new Float32Array(systems.length * 3)
     const random = mulberry32(8128)
@@ -278,6 +328,8 @@ function EarthSurface() {
     <>
       <mesh>
         <sphereGeometry args={[1, 160, 160]} />
+        {/* The Sun now sits in frame, so the near hemisphere is backlit.
+            A faint earthshine keeps the continents readable on the dark side. */}
         <meshPhongMaterial
           map={day}
           normalMap={normal}
@@ -285,6 +337,9 @@ function EarthSurface() {
           specularMap={specular}
           specular="#93b8e8"
           shininess={22}
+          emissiveMap={day}
+          emissive="#2f5f9e"
+          emissiveIntensity={0.24}
         />
       </mesh>
       <mesh ref={cloudShell} scale={1.007}>
@@ -323,6 +378,44 @@ function Earth() {
   )
 }
 
+/**
+ * The Sun, seen from Earth: a small, brilliant disc about half a degree across
+ * sitting 1,500 units beyond the camera's reach, on the direction the key light
+ * actually comes from. It is scenery only — it never takes a pointer event, so
+ * it cannot interfere with orbit drag or the zoom-out handoff.
+ */
+function Sun({ glow }) {
+  return (
+    <group position={SUN_POSITION.toArray()}>
+      <mesh>
+        <sphereGeometry args={[SUN_VIEW_RADIUS, 32, 32]} />
+        <meshBasicMaterial color="#fff4d8" toneMapped={false} />
+      </mesh>
+      <sprite scale={[SUN_VIEW_RADIUS * 3.2, SUN_VIEW_RADIUS * 3.2, 1]}>
+        <spriteMaterial
+          map={glow}
+          color="#ffd9a0"
+          transparent
+          opacity={0.55}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </sprite>
+      <sprite scale={[SUN_VIEW_RADIUS * 2.2, SUN_VIEW_RADIUS * 2.2, 1]}>
+        <spriteMaterial
+          map={glow}
+          color="#ffffff"
+          transparent
+          opacity={0.85}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </sprite>
+    </group>
+  )
+}
+
+
 /** The ship holds a slow, low orbit, nose along its direction of travel. */
 function OrbitingShip() {
   const group = useRef()
@@ -330,7 +423,7 @@ function OrbitingShip() {
 
   useFrame(({ clock }) => {
     if (!group.current) return
-    // Start on the Sun-facing side so the ship reads against the lit Earth.
+    // Start on the camera-facing side so the ship reads against the limb.
     const t = clock.elapsedTime * 0.038 + 2.4
     const radius = 1.78
     const x = Math.cos(t) * radius
@@ -352,11 +445,32 @@ function OrbitingShip() {
   )
 }
 
-function OrbitRig({ onZoomOut }) {
+/** Furthest the opening camera may pull back before the handoff gesture. */
+const MAX_ORBIT_DISTANCE = 10
+/** Within this share of the limit the scene is "at the limit" for the handoff. */
+const LIMIT_BAND = 0.9
+
+/**
+ * Earth's orbit camera, plus the zoom-out handoff to the star map.
+ *
+ * The handoff used to require a nearly exact camera distance (97% of the limit)
+ * *and* a fixed 220 of raw `deltaY`, which a trackpad or a coarse wheel could
+ * miss entirely. It is now: engaged scene + camera inside the limit band +
+ * 150 normalised pixels of outward wheel travel (lib/zoomTransition.js). The
+ * latch fires once per gesture, so repeats cannot double-fire, and scrolling
+ * back in clears it.
+ *
+ * Engagement is what keeps a page scroll over the hero from warping anyone: the
+ * scene must have been clicked (or focused), and it lets go when the pointer
+ * leaves the canvas.
+ */
+function OrbitRig({ onZoomOut, onLimitChange }) {
   const { camera, gl } = useThree()
   const controls = useRef(null)
   const zoomOut = useRef(onZoomOut)
   zoomOut.current = onZoomOut
+  const limitChange = useRef(onLimitChange)
+  limitChange.current = onLimitChange
 
   useEffect(() => {
     const instance = new OrbitControls(camera, gl.domElement)
@@ -366,7 +480,7 @@ function OrbitRig({ onZoomOut }) {
     instance.rotateSpeed = 0.42
     instance.zoomSpeed = 0.55
     instance.minDistance = 2.35
-    instance.maxDistance = 7.4
+    instance.maxDistance = MAX_ORBIT_DISTANCE
     instance.minPolarAngle = Math.PI * 0.17
     instance.maxPolarAngle = Math.PI * 0.83
     instance.autoRotate = true
@@ -375,24 +489,74 @@ function OrbitRig({ onZoomOut }) {
     instance.update()
     controls.current = instance
 
-    // Scrolling out at the zoom limit is the gesture that leaves orbit: once
-    // the camera is fully back and the user keeps pulling, hand off to the map.
-    let pull = 0
+    const element = gl.domElement
+    element.tabIndex = 0
+    element.style.outline = 'none'
+
+    let engaged = false
+    let atLimit = false
+    let idleTimer = null
+    const latch = createZoomOutLatch()
+
+    const reportLimit = (next) => {
+      if (next === atLimit) return
+      atLimit = next
+      limitChange.current?.(next)
+    }
+
+    const engage = () => {
+      engaged = true
+      // The opening drift stops as soon as the visitor steers.
+      instance.autoRotate = false
+      element.focus?.({ preventScroll: true })
+    }
+    const release = () => {
+      engaged = false
+      latch.reset()
+      reportLimit(false)
+    }
+
     const handleWheel = (event) => {
+      const pixels = wheelPixels(event)
       const distance = camera.position.distanceTo(instance.target)
-      if (event.deltaY > 0 && distance > instance.maxDistance * 0.97) {
-        pull += event.deltaY
-        if (pull > 220) {
-          pull = 0
-          zoomOut.current?.()
-        }
-      } else {
-        pull = 0
+      const withinLimit = distance >= instance.maxDistance * LIMIT_BAND
+
+      clearTimeout(idleTimer)
+      idleTimer = setTimeout(() => {
+        latch.reset()
+        reportLimit(false)
+      }, 420)
+
+      if (!engaged) {
+        latch.reset()
+        reportLimit(false)
+        return
+      }
+
+      instance.autoRotate = false
+      reportLimit(pixels > 0 && withinLimit)
+
+      if (latch.push(pixels, withinLimit)) {
+        latch.reset()
+        reportLimit(false)
+        zoomOut.current?.()
       }
     }
-    gl.domElement.addEventListener('wheel', handleWheel, { passive: true })
+
+    element.addEventListener('pointerdown', engage)
+    element.addEventListener('focus', engage)
+    element.addEventListener('pointerleave', release)
+    window.addEventListener('blur', release)
+    element.addEventListener('wheel', handleWheel, { passive: true })
     return () => {
-      gl.domElement.removeEventListener('wheel', handleWheel)
+      clearTimeout(idleTimer)
+      element.removeEventListener('pointerdown', engage)
+      element.removeEventListener('focus', engage)
+      element.removeEventListener('pointerleave', release)
+      window.removeEventListener('blur', release)
+      element.removeEventListener('wheel', handleWheel)
+      latch.reset()
+      limitChange.current?.(false)
       instance.dispose()
     }
   }, [camera, gl])
@@ -401,37 +565,73 @@ function OrbitRig({ onZoomOut }) {
   return null
 }
 
-function Scene({ onZoomOut }) {
+/** Widen the lens on tall phone screens so Earth and the Sun stay in frame. */
+function ResponsiveFraming() {
+  const { camera, size } = useThree()
+  useEffect(() => {
+    const aspect = size.width / Math.max(1, size.height)
+    camera.fov = aspect < 1 ? 62 : 48
+    camera.updateProjectionMatrix()
+  }, [camera, size.width, size.height])
+  return null
+}
+
+function Scene({ onZoomOut, onLimitChange }) {
   const glow = useMemo(createGlowTexture, [])
   useEffect(() => () => glow.dispose(), [glow])
 
   return (
     <>
       <color attach="background" args={[SPACE]} />
-      <ambientLight intensity={0.09} color="#5f7bb8" />
+      <ResponsiveFraming />
+      <ambientLight intensity={0.18} color="#5f7bb8" />
+      {/* Key light straight from the visible Sun, plus a soft camera-side fill
+          so the backlit near hemisphere still reads. */}
       <directionalLight
         position={SUN_DIRECTION.clone().multiplyScalar(12).toArray()}
-        intensity={2.6}
+        intensity={2.4}
         color={SUN_COLOR}
       />
+      <directionalLight position={[2.6, 1.2, 5.5]} intensity={1.0} color="#8fb6e8" />
       <MilkyWay />
       <StarField glow={glow} />
+      <Sun glow={glow} />
       <Earth />
       <OrbitingShip />
-      <OrbitRig onZoomOut={onZoomOut} />
+      <OrbitRig onZoomOut={onZoomOut} onLimitChange={onLimitChange} />
     </>
   )
 }
 
 const OrbitCanvas = memo(function OrbitCanvas({ onZoomOut }) {
+  const [atLimit, setAtLimit] = useState(false)
+
   return (
-    <Canvas
-      dpr={[1, 2]}
-      camera={{ fov: 34, position: [2.3, 1.5, 5.9], near: 0.05, far: 1200 }}
-      gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-    >
-      <Scene onZoomOut={onZoomOut} />
-    </Canvas>
+    <div className="relative h-full w-full">
+      <Canvas
+        dpr={[1, 2]}
+        camera={{ fov: 48, position: HOME_CAMERA.toArray(), near: 0.1, far: 4000 }}
+        gl={{
+          antialias: true,
+          alpha: false,
+          powerPreference: 'high-performance',
+          // The Sun sits 1,500 units out; a logarithmic depth buffer keeps
+          // Earth's surface free of z-fighting across that range.
+          logarithmicDepthBuffer: true,
+        }}
+      >
+        <Scene onZoomOut={onZoomOut} onLimitChange={setAtLimit} />
+      </Canvas>
+
+      {/* Outward-scroll affordance: the handoff is a gesture, so it says so. */}
+      {atLimit && (
+        <div className="pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center px-4">
+          <div className="rounded-full border border-white/25 bg-[#04010c]/80 px-3 py-1.5 text-[10px] tracking-[0.16em] text-white/80 uppercase backdrop-blur">
+            Keep scrolling out to open the star map
+          </div>
+        </div>
+      )}
+    </div>
   )
 })
 

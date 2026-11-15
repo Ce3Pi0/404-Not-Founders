@@ -6,6 +6,7 @@ import { HAS_WEBGL } from '../../lib/webgl'
 import { createGlowTexture } from '../../lib/glowTexture'
 import { createPlanetTexture, mulberry32 } from '../../lib/planet'
 import { niceAu } from '../../lib/planetSystem'
+import EarthSphere from '../EarthSphere'
 
 /** Cyan is the app's signature accent for the inspected object. */
 const CYAN = '#5ee7ff'
@@ -18,6 +19,9 @@ function StarField({ extent, glow }) {
     const rand = mulberry32(90210)
     const count = 900
     const positions = new Float32Array(count * 3)
+    const colors = new Float32Array(count * 3)
+    const palette = ['#ffffff', '#dbe9ff', '#b9d0ff', '#ffe8c2', '#ffc79a', '#ff9f7e']
+    const tint = new THREE.Color()
     for (let i = 0; i < count; i += 1) {
       const u = rand() * 2 - 1
       const theta = rand() * Math.PI * 2
@@ -26,9 +30,13 @@ function StarField({ extent, glow }) {
       positions[i * 3] = Math.cos(theta) * ring * radius
       positions[i * 3 + 1] = u * radius
       positions[i * 3 + 2] = Math.sin(theta) * ring * radius
+      tint.set(palette[Math.floor(rand() * palette.length)])
+      const brightness = 0.45 + rand() * 0.55
+      colors.set([tint.r * brightness, tint.g * brightness, tint.b * brightness], i * 3)
     }
     const buffer = new THREE.BufferGeometry()
     buffer.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    buffer.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     return buffer
   }, [extent])
 
@@ -40,9 +48,9 @@ function StarField({ extent, glow }) {
         map={glow}
         size={1.7}
         sizeAttenuation={false}
-        color="#ffffff"
+        vertexColors
         transparent
-        opacity={0.32}
+        opacity={0.38}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
       />
@@ -77,11 +85,17 @@ function OrbitRing({ radius, active }) {
 }
 
 function PlanetBody({ body, selected, glow }) {
-  const surface = useMemo(() => createPlanetTexture(body.planet), [body.planet])
+  // Earth has real imagery, so it wears the same Blue Marble surface as the
+  // dedicated Earth view. Every other world keeps its procedural surface.
+  const isEarth = body.planet.kind === 'earth'
+  const surface = useMemo(
+    () => (isEarth ? null : createPlanetTexture(body.planet)),
+    [body.planet, isEarth],
+  )
   const spin = useRef()
   const radius = body.radiusUnits
 
-  useEffect(() => () => surface.texture.dispose(), [surface])
+  useEffect(() => () => surface?.texture.dispose(), [surface])
 
   useFrame((_, delta) => {
     if (spin.current) spin.current.rotation.y += delta * 0.08
@@ -89,10 +103,16 @@ function PlanetBody({ body, selected, glow }) {
 
   return (
     <group>
-      <mesh ref={spin}>
-        <sphereGeometry args={[radius, 32, 32]} />
-        <meshStandardMaterial map={surface.texture} roughness={0.92} metalness={0.03} />
-      </mesh>
+      <group ref={spin}>
+        {isEarth ? (
+          <EarthSphere radius={radius} segments={64} />
+        ) : (
+          <mesh>
+            <sphereGeometry args={[radius, 32, 32]} />
+            <meshStandardMaterial map={surface.texture} roughness={0.92} metalness={0.03} />
+          </mesh>
+        )}
+      </group>
       {selected && (
         <sprite scale={[radius * 7, radius * 7, 1]}>
           <spriteMaterial
@@ -373,7 +393,7 @@ function SceneRig({
 
   return (
     <>
-      <color attach="background" args={['#160040']} />
+      <color attach="background" args={['#000000']} />
       <StarField extent={system.extentAu} glow={glow} />
       <HostStar star={system.star} glow={glow} />
       {orbitsOn &&
