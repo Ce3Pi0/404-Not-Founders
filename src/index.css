@@ -122,6 +122,25 @@
   animation: pulse-soft 2.4s ease-in-out infinite;
 }
 
+/* Live Flight arrival flourish: one calm bloom, no gradient. */
+@keyframes arrival-bloom {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  35% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.arrival-bloom {
+  animation: arrival-bloom 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
 input[type="range"].slider {
   appearance: none;
   -webkit-appearance: none;

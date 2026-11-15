@@ -2,13 +2,10 @@ import {
   formatDays,
   formatNumber,
   formatYears,
-  percentError,
-  predictionRank,
   surfaceClockRate,
   surfaceGravity,
 } from '../lib/physics'
 import { classifyPlanet } from '../lib/planet'
-import { useAppStore } from '../store/appStore'
 import CrewLineup from './CrewLineup'
 
 function Stat({ label, value, sub, tone = 'text-ink' }) {
@@ -27,55 +24,6 @@ function tinyPercent(value) {
   return `${pct.toExponential(1)}%`
 }
 
-function PredictionCard({ prediction, mission }) {
-  const guessEarth = prediction.earth === '' ? null : Number(prediction.earth)
-  const guessShip = prediction.ship === '' ? null : Number(prediction.ship)
-  const earthError = percentError(guessEarth, mission.earthYears)
-  const shipError = percentError(guessShip, mission.shipYears)
-  const rank = predictionRank(earthError, shipError)
-  const filed = earthError != null || shipError != null
-
-  return (
-    <section className="panel p-5">
-      <div className="flex items-baseline justify-between gap-3">
-        <div className="label">Your prediction</div>
-        <span className="rounded-full border border-line bg-white/[0.03] px-2 py-0.5 text-[10px] text-ink/80">
-          {rank.title}
-        </span>
-      </div>
-
-      {filed ? (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <div className="rounded-lg border border-line/70 bg-void/40 px-3 py-2">
-            <div className="text-[9px] tracking-[0.14em] text-muted uppercase">Earth</div>
-            <div className="mt-1 text-[12px] text-ink">
-              you {formatNumber(guessEarth, 2)} · actual {formatNumber(mission.earthYears, 2)} yr
-            </div>
-            <div className="mt-0.5 text-[10px] text-muted">
-              {earthError != null ? `${earthError.toFixed(1)}% off` : 'not guessed'}
-            </div>
-          </div>
-          <div className="rounded-lg border border-line/70 bg-void/40 px-3 py-2">
-            <div className="text-[9px] tracking-[0.14em] text-muted uppercase">Ship</div>
-            <div className="mt-1 text-[12px] text-ink">
-              you {formatNumber(guessShip, 2)} · actual {formatNumber(mission.shipYears, 2)} yr
-            </div>
-            <div className="mt-0.5 text-[10px] text-muted">
-              {shipError != null ? `${shipError.toFixed(1)}% off` : 'not guessed'}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <p className="mt-3 text-[12px] text-muted">
-          No prediction filed this mission — fly the route again and lock in a guess before launch.
-        </p>
-      )}
-
-      <p className="mt-2 text-[11px] leading-relaxed text-muted">{rank.note}</p>
-    </section>
-  )
-}
-
 function PhysicsCard({ mission, planet }) {
   const gravity = surfaceGravity(planet.massEarth, planet.radiusEarth)
   const clockRate = surfaceClockRate(planet.massEarth, planet.radiusEarth)
@@ -90,11 +38,11 @@ function PhysicsCard({ mission, planet }) {
           <span className="text-muted">γ = 1/√(1−β²)</span> = {mission.gamma.toFixed(4)}
         </div>
         <div>
-          <span className="text-muted">t<sub>⊕</sub> = d/(βc)</span> = {formatNumber(mission.distanceLy, 2)} ly ÷{' '}
+          <span className="text-muted">t⊕ = d/(βc)</span> = {formatNumber(mission.distanceLy, 2)} ly ÷{' '}
           {mission.beta.toFixed(3)} = {formatNumber(mission.earthYears, 3)} yr
         </div>
         <div>
-          <span className="text-muted">t<sub>ship</sub> = t<sub>⊕</sub>/γ</span> ={' '}
+          <span className="text-muted">t_ship = t⊕/γ</span> ={' '}
           <span className="text-ink">{formatNumber(mission.shipYears, 3)} yr</span>
         </div>
         <div>
@@ -215,17 +163,8 @@ function MissionLog({ sim, planet, onNext, onReset, onGoHome }) {
   )
 }
 
-export default function Debrief() {
-  const mission = useAppStore((state) => state.mission)
-  const planet = useAppStore((state) => state.planet)
-  const prediction = useAppStore((state) => state.prediction)
-  const sim = useAppStore((state) => state.sim)
-  const nextMission = useAppStore((state) => state.nextMission)
-  const reset = useAppStore((state) => state.reset)
-  const goHome = useAppStore((state) => state.goHome)
-
+export default function Debrief({ mission, planet, origin, sim, onNext, onReset, onGoHome }) {
   const look = classifyPlanet(planet)
-  if (!mission) return null
   const ratio = mission.gamma
 
   return (
@@ -270,11 +209,10 @@ export default function Debrief() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-4">
           <CrewLineup planet={planet} sim={sim} shipName={mission.shipName} />
-          <PredictionCard prediction={prediction} mission={mission} />
         </div>
         <div className="min-w-0 space-y-4">
           <PhysicsCard mission={mission} planet={planet} />
-          <MissionLog sim={sim} planet={planet} onNext={nextMission} onReset={reset} onGoHome={goHome} />
+          <MissionLog sim={sim} planet={planet} onNext={onNext} onReset={onReset} onGoHome={onGoHome} />
         </div>
       </div>
     </div>

@@ -12,7 +12,7 @@ export default function StageProgress({ stage, progress }) {
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
         <div
-          className="h-full rounded-full bg-ion/70 duration-150"
+          className="h-full rounded-full bg-gradient-to-r from-ion/70 to-mint transition-[width] duration-150"
           style={{ width: `${Math.min(100, progress * 100)}%` }}
         />
       </div>
@@ -26,10 +26,10 @@ export default function StageProgress({ stage, progress }) {
                 }`}
             >
               <span
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${state === 'current' ? 'bg-ion' : state === 'done' ? 'bg-mint/70' : 'bg-white/15'
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${state === 'current' ? 'bg-ion shadow-[0_0_8px_rgba(94,231,255,0.9)]' : state === 'done' ? 'bg-mint/70' : 'bg-white/15'
                   }`}
               />
-              <span className="truncate font-semibold">{item.label}</span>
+              <span className="truncate">{item.label}</span>
             </li>
           )
         })}

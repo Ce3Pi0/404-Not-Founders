@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import { useAppStore } from '../store/appStore'
 
 const SECTIONS = [
   {
@@ -48,9 +47,7 @@ const SECTIONS = [
   },
 ]
 
-export default function AboutDialog() {
-  const open = useAppStore((state) => state.aboutOpen)
-  const onClose = useAppStore((state) => state.closeAbout)
+export default function AboutDialog({ open, onClose }) {
   const closeRef = useRef(null)
 
   useEffect(() => {

@@ -1,6 +1,10 @@
-import { memo, useEffect, useMemo, useRef } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { memo, Suspense, useEffect, useMemo, useRef } from 'react'
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import earthDayMap from '../assets/earth/earth_atmos_2048.jpg'
+import earthNormalMap from '../assets/earth/earth_normal_2048.jpg'
+import earthSpecularMap from '../assets/earth/earth_specular_2048.jpg'
+import earthCloudMap from '../assets/earth/earth_clouds_1024.png'
 import { OrbitControls as ThreeOrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import {
   createPlanetTexture,
@@ -13,7 +17,6 @@ import {
 } from '../lib/planet'
 import { describeAge } from '../lib/aging'
 import { formatNumber } from '../lib/physics'
-import { useAppStore } from '../store/appStore'
 import BobbleFigure from './BobbleFigure'
 import SkeletonFigure from './SkeletonFigure'
 
@@ -24,15 +27,115 @@ const UP = new THREE.Vector3(0, 1, 0)
  * a meaningful fraction of a world. */
 const CREW_SCALE = 0.07
 
+/* Earth is the one world we have real imagery for, so it is drawn from NASA
+ * Blue Marble maps — day colour, terrain relief, ocean gloss — under a separate
+ * cloud shell. Exoplanets keep the procedural surface. */
+function EarthSurface() {
+  const [day, normal, specular, clouds] = useLoader(THREE.TextureLoader, [
+    earthDayMap,
+    earthNormalMap,
+    earthSpecularMap,
+    earthCloudMap,
+  ])
+  const cloudShell = useRef()
+
+  useMemo(() => {
+    day.colorSpace = THREE.SRGBColorSpace
+    clouds.colorSpace = THREE.SRGBColorSpace
+    for (const texture of [day, normal, specular, clouds]) {
+      texture.anisotropy = 8
+      texture.wrapS = THREE.RepeatWrapping
+    }
+  }, [day, normal, specular, clouds])
+
+  useFrame((_, delta) => {
+    // Clouds drift a little faster than the ground below them.
+    if (cloudShell.current) cloudShell.current.rotation.y += delta * 0.006
+  })
+
+  return (
+    <>
+      <mesh>
+        <sphereGeometry args={[1, 128, 128]} />
+        <meshPhongMaterial
+          map={day}
+          normalMap={normal}
+          normalScale={[0.7, 0.7]}
+          specularMap={specular}
+          specular="#6f9ad0"
+          shininess={16}
+        />
+      </mesh>
+      <mesh ref={cloudShell} scale={1.006}>
+        <sphereGeometry args={[1, 96, 96]} />
+        <meshStandardMaterial
+          map={clouds}
+          transparent
+          opacity={0.9}
+          roughness={1}
+          metalness={0}
+          depthWrite={false}
+        />
+      </mesh>
+    </>
+  )
+}
+
+function EarthPlaceholder() {
+  return (
+    <mesh>
+      <sphereGeometry args={[1, 64, 64]} />
+      <meshStandardMaterial color="#1b4f8c" roughness={0.9} metalness={0.03} />
+    </mesh>
+  )
+}
+
+/** Pale blue rim: a bright inner edge and a soft outer haze, as seen from orbit. */
+function EarthAtmosphere() {
+  return (
+    <group>
+      <mesh scale={1.028}>
+        <sphereGeometry args={[1, 64, 64]} />
+        <meshBasicMaterial
+          color="#7cc0ff"
+          transparent
+          opacity={0.5}
+          side={THREE.BackSide}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh scale={1.09}>
+        <sphereGeometry args={[1, 64, 64]} />
+        <meshBasicMaterial
+          color="#3f7fd0"
+          transparent
+          opacity={0.14}
+          side={THREE.BackSide}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
+  )
+}
+
 function PlanetMesh({ planet, earthYears, alienYears }) {
-  const { texture, look } = useMemo(() => createPlanetTexture(planet), [planet])
+  const isEarth = planet.kind === 'earth'
+  const surface = useMemo(
+    () => (isEarth ? null : createPlanetTexture(planet)),
+    [planet, isEarth],
+  )
+  const look = useMemo(() => classifyPlanet(planet), [planet])
   const tilt = useMemo(() => {
     const rand = mulberry32(hashString(planet.name))
     return rand() * 0.5 - 0.25
   }, [planet.name])
   const spin = useRef()
 
-  useEffect(() => () => texture.dispose(), [texture])
+  useEffect(() => () => surface?.texture.dispose(), [surface])
 
   useFrame((_, delta) => {
     if (spin.current) spin.current.rotation.y += delta * 0.02
@@ -41,13 +144,19 @@ function PlanetMesh({ planet, earthYears, alienYears }) {
   return (
     <group rotation={[0, 0, tilt]}>
       <group ref={spin}>
-        <mesh>
-          <sphereGeometry args={[1, 96, 96]} />
-          <meshStandardMaterial map={texture} roughness={0.9} metalness={0.03} />
-        </mesh>
+        {isEarth ? (
+          <Suspense fallback={<EarthPlaceholder />}>
+            <EarthSurface />
+          </Suspense>
+        ) : (
+          <mesh>
+            <sphereGeometry args={[1, 96, 96]} />
+            <meshStandardMaterial map={surface.texture} roughness={0.9} metalness={0.03} />
+          </mesh>
+        )}
         <SurfaceCrew planet={planet} look={look} earthYears={earthYears} alienYears={alienYears} />
       </group>
-      <Atmosphere color={look.atmosphere} />
+      {isEarth ? <EarthAtmosphere /> : <Atmosphere color={look.atmosphere} />}
     </group>
   )
 }
@@ -243,11 +352,19 @@ function OrbitRig() {
 }
 
 function Scene({ planet, earthYears, alienYears }) {
+  const isEarth = planet.kind === 'earth'
+
   return (
     <>
       <ambientLight intensity={0.22} />
       {/* camera-side fill so the visible hemisphere reads; the host star is the key light */}
-      <directionalLight position={[2.6, 1.2, 5.5]} intensity={0.95} color="#ffffff" />
+      <directionalLight
+        position={[2.6, 1.2, 5.5]}
+        intensity={isEarth ? 0.32 : 0.95}
+        color="#ffffff"
+      />
+      {/* Earth's sun sits high and to the left, leaving the terminator at the lower right. */}
+      {isEarth && <directionalLight position={[-2.6, 2.4, 4.2]} intensity={1.6} color="#fff6ea" />}
       <StarField />
       <HostStar planet={planet} />
       <PlanetMesh planet={planet} earthYears={earthYears} alienYears={alienYears} />
@@ -256,12 +373,7 @@ function Scene({ planet, earthYears, alienYears }) {
   )
 }
 
-function PlanetStage({ compact = false }) {
-  const planet = useAppStore((state) => state.location)
-  const sim = useAppStore((state) => state.sim)
-  const onGoHome = useAppStore((state) => state.goHome)
-  const earthYears = sim.earthYears
-  const alienYears = sim.earthYears
+function PlanetStage({ planet, earthYears, alienYears, compact = false, onGoHome }) {
   const look = classifyPlanet(planet)
   const star = describeStar(planet)
   const starAngle = starAngularDiameterDeg(planet)

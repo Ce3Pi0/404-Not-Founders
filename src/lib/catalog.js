@@ -1,5 +1,4 @@
 import csvText from "../data/exoplanets.csv?raw";
-import { EARTH } from "./earth";
 import { hashString, mulberry32 } from "./planet";
 
 export const LY_PER_PC = 3.26156;
@@ -78,6 +77,22 @@ function positionVector(raDeg, decDeg, parsecs) {
 }
 
 /**
+ * Map frame — right-handed, Y-up, light-years, Solar System at the origin.
+ * This is kept separate from the equatorial parsec vectors above: the map uses
+ * NASA's RA/Dec angles directly (RA → X/Z, Dec → Y) and physical distances, so
+ * display coordinates never feed back into route or travel calculations.
+ */
+export function mapCartesian(raDeg, decDeg, distanceLy) {
+  const ra = raDeg * DEG;
+  const dec = decDeg * DEG;
+  return [
+    distanceLy * Math.cos(dec) * Math.cos(ra),
+    distanceLy * Math.sin(dec),
+    distanceLy * Math.cos(dec) * Math.sin(ra),
+  ];
+}
+
+/**
  * Host-star properties are not in the extract, so they are derived from the
  * orbit with Kepler's third law (M = a³/P²) and standard main-sequence
  * mass–radius–luminosity relations. All derived values are marked as such.
@@ -134,6 +149,28 @@ function deriveBulk(name, eqTempK) {
   };
 }
 
+export const EARTH = {
+  id: "earth",
+  name: "Earth",
+  star: "Solar System",
+  kind: "earth",
+  distancePc: 0,
+  distanceLy: 0,
+  ra: 0,
+  dec: 0,
+  semiMajorAxisAu: 1,
+  orbitalPeriodDays: 365.25,
+  radiusEarth: 1,
+  massEarth: 1,
+  densityGcc: 5.51,
+  eqTempK: 255,
+  starMassSun: 1,
+  starRadiusSun: 1,
+  starTeffK: 5772,
+  starLuminositySun: 1,
+  position: [0, 0, 0],
+};
+
 const EXOPLANETS = lines
   .filter((line) => cell(line, "pl_name") && cell(line, "hostname"))
   .map((line, index) => {
@@ -141,7 +178,8 @@ const EXOPLANETS = lines
     const star = cell(line, "hostname").trim();
     const ra = num(line, "ra") ?? 0;
     const dec = num(line, "dec") ?? 0;
-    const distancePc = num(line, "sy_dist") ?? 0;
+    const measuredPc = num(line, "sy_dist");
+    const distancePc = measuredPc ?? 0;
     const semiMajorAxisAu = num(line, "pl_orbsmax");
     const orbitalPeriodDays = num(line, "pl_orbper");
     const starProps = deriveStar(
@@ -168,6 +206,9 @@ const EXOPLANETS = lines
       dec,
       distancePc,
       distanceLy: distancePc * LY_PER_PC,
+      // `distancePc` keeps its historic 0 fallback so routes and search behave
+      // as before; the map needs to know whether the archive reported one.
+      distanceKnown: measuredPc != null && measuredPc > 0,
       semiMajorAxisAu,
       orbitalPeriodDays,
       eqTempK: eqTempK == null ? null : Math.round(eqTempK),
@@ -177,7 +218,7 @@ const EXOPLANETS = lines
     };
   });
 
-export const PLANETS = [...EXOPLANETS];
+export const PLANETS = [EARTH, ...EXOPLANETS];
 export const BY_ID = new Map(PLANETS.map((planet) => [planet.id, planet]));
 export const BY_NAME = new Map(PLANETS.map((planet) => [planet.name, planet]));
 
@@ -199,6 +240,12 @@ export const SYSTEMS = (() => {
         position: planet.position,
         distancePc: planet.distancePc,
         distanceLy: planet.distanceLy,
+        distanceKnown: planet.distanceKnown,
+        // Exact map-frame Cartesian coordinates in light-years (or null when
+        // the archive reported no distance and the system has no real place).
+        mapPosition: planet.distanceKnown
+          ? mapCartesian(planet.ra, planet.dec, planet.distanceLy)
+          : null,
         ra: planet.ra,
         dec: planet.dec,
         planets: [planet],
@@ -210,6 +257,8 @@ export const SYSTEMS = (() => {
     position: [0, 0, 0],
     distancePc: 0,
     distanceLy: 0,
+    distanceKnown: true,
+    mapPosition: [0, 0, 0],
     ra: 0,
     dec: 0,
     planets: [EARTH],
@@ -217,19 +266,13 @@ export const SYSTEMS = (() => {
   return map;
 })();
 
-/**
- * Worlds normally carry a precomputed `position`, but not every synthetic
- * station does (e.g. Earth). Fall back to building the vector from the
- * catalog coordinates so a missing cache can never break a render.
- */
-const vectorOf = (planet) =>
-  Array.isArray(planet?.position)
-    ? planet.position
-    : positionVector(
-        planet?.ra ?? 0,
-        planet?.dec ?? 0,
-        planet?.distancePc ?? 0,
-      );
+/** Unique host-star systems with a measured distance, in the map frame. */
+export const MAPPED_SYSTEMS = [...SYSTEMS.values()].filter(
+  (system) => system.mapPosition,
+);
+
+/** Systems kept in search/routes but left off the map: distance unknown. */
+export const UNMAPPED_SYSTEM_COUNT = SYSTEMS.size - MAPPED_SYSTEMS.length;
 
 /** Great-unknown route length between two worlds, in light-years. */
 export function distanceLyBetween(from, to) {
@@ -241,8 +284,8 @@ export function distanceLyBetween(from, to) {
     if (a == null || b == null) return 0.00001;
     return Math.max(0.00001, Math.abs(a - b) * LY_PER_AU);
   }
-  const [ax, ay, az] = vectorOf(from);
-  const [bx, by, bz] = vectorOf(to);
+  const [ax, ay, az] = from.position;
+  const [bx, by, bz] = to.position;
   return Math.hypot(ax - bx, ay - by, az - bz) * LY_PER_PC;
 }
 
@@ -295,7 +338,6 @@ export function searchPlanets(query, limit = 16) {
   return [...starts, ...contains].slice(0, limit);
 }
 
-/** The world offered as the destination before the user picks a route. */
 export const DEFAULT_PLANET =
   BY_NAME.get("TRAPPIST-1 e") ??
   RECOMMENDED[0] ??
