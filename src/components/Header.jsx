@@ -33,8 +33,8 @@ function Brand() {
 }
 
 export default function Header({ step, sim, location, onGoHome, onAbout, onReset, inLab = false, onOpenLab }) {
-   const away = location && location.kind !== 'earth'
-  
+  const away = location && location.kind !== 'earth'
+
   return (
     <header className="sticky top-0 z-40 border-b border-line/60 bg-void/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 lg:px-8">
@@ -50,22 +50,21 @@ export default function Header({ step, sim, location, onGoHome, onAbout, onReset
           </div>
         )}
 
-        <nav aria-label="Mission stages" className="hidden items-center gap-1 md:flex">
+        <nav aria-label="Mission stages" className="hidden items-center gap-2 md:flex">
           {STEPS.map((entry, index) => {
             const active = entry.id === step
             const passed = STEPS.findIndex((s) => s.id === step) > index
             return (
               <div
+                onClick={() => { }} // TODO: Set step
                 key={entry.id}
                 aria-current={active ? 'step' : undefined}
-                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] tracking-[0.12em] uppercase transition ${
-                  active ? 'bg-ion text-white' : passed ? 'text-ink/70' : 'text-ink/40'
-                }`}
+                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] tracking-[0.12em] uppercase transition hover:bg-ion/50 hover:cursor-pointer ${active ? 'bg-ion! text-white' : passed ? 'text-ink/70' : 'text-ink/40'
+                  }`}
               >
                 <span
-                  className={`num flex h-4 w-4 items-center justify-center rounded-full border text-[9px] ${
-                    active ? 'border-white/70 text-white' : passed ? 'border-ink/40 text-ink/60' : 'border-line/70 text-ink/40'
-                  }`}
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] leading-none font-semibold tabular-nums tracking-normal ${active ? 'border-white/70 text-white' : passed ? 'border-ink/40 text-ink/60' : 'border-line/70 text-ink/40'
+                    }`}
                 >
                   {index + 1}
                 </span>

@@ -16,8 +16,8 @@ function Fact({ label, value, sub }) {
   return (
     <div className="bg-panel/25 px-3.5 py-3">
       <div className="text-[9px] tracking-[0.16em] text-ink/50 uppercase">{label}</div>
-      <div className="num mt-1 text-[13px] text-ink">{value}</div>
-      {sub && <div className="num mt-0.5 text-[10px] text-ink/50">{sub}</div>}
+      <div className="mt-1 text-[13px] text-ink">{value}</div>
+      {sub && <div className="mt-0.5 text-[10px] text-ink/50">{sub}</div>}
     </div>
   )
 }
@@ -186,7 +186,7 @@ export default function DestinationPicker({
             {origin.name} <span className="text-ink/45">→</span> {planet.name}
           </div>
         </div>
-        <div className="num text-right text-[12px] text-ink">
+        <div className="text-right text-[12px] text-ink">
           {formatNumber(distanceLy, distanceLy < 1 ? 5 : 2)} ly
         </div>
       </div>
@@ -202,7 +202,7 @@ export default function DestinationPicker({
               onClick={() => chooseDestination(entry)}
             >
               {entry.name}
-              <span className="num text-[10px] text-ink/55">{formatNumber(entry.distanceLy, 1)} ly</span>
+              <span className="text-[10px] text-ink/55">{formatNumber(entry.distanceLy, 1)} ly</span>
             </button>
           ))}
         </div>

@@ -281,7 +281,7 @@ function PlanetStage({ planet, earthYears, alienYears, compact = false, onGoHome
             <h2 className="mt-1 text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
               {planet.name}
             </h2>
-            <div className="num mt-1 text-[11px] text-ink/70">
+            <div className="mt-1 text-[11px] text-ink/70">
               {planet.star ?? planet.name} ·{' '}
               {isEarth ? 'origin' : `${formatNumber(planet.distanceLy, 2)} ly from Earth`}
             </div>
@@ -290,13 +290,13 @@ function PlanetStage({ planet, earthYears, alienYears, compact = false, onGoHome
             <span className="rounded-full border border-line/70 bg-void/80 px-2.5 py-1 text-[10px] tracking-[0.16em] text-ink/75 uppercase">
               {look.label}
             </span>
-            <span className="num rounded-full border border-line/60 bg-void/80 px-2.5 py-1 text-[10px] text-ink/70">
+            <span className="rounded-full border border-line/60 bg-void/80 px-2.5 py-1 text-[10px] text-ink/70">
               {star.name}
               {starAngle != null
                 ? ` · ${starAngle < 1 ? starAngle.toFixed(2) : starAngle.toFixed(1)}° wide`
                 : ''}
             </span>
-            <span className="num rounded-full border border-line/60 bg-void/80 px-2.5 py-1 text-[10px] text-ink/60">
+            <span className="rounded-full border border-line/60 bg-void/80 px-2.5 py-1 text-[10px] text-ink/60">
               orbit{' '}
               {planet.semiMajorAxisAu != null
                 ? `${formatNumber(planet.semiMajorAxisAu, planet.semiMajorAxisAu < 0.1 ? 3 : 2)} AU`
@@ -312,7 +312,7 @@ function PlanetStage({ planet, earthYears, alienYears, compact = false, onGoHome
                 <span className="h-1.5 w-1.5 rounded-full bg-[#9a0680]" />
                 <span className="label text-[9px]">{isEarth ? 'Crew on Earth' : 'You (crew)'}</span>
               </div>
-              <div className="num mt-0.5 text-[11px] text-ink">{human.label}</div>
+              <div className="mt-0.5 text-[11px] text-ink">{human.label}</div>
             </div>
             {!isEarth && (
               <div className="pointer-events-none absolute right-3 bottom-3 max-w-[46%] rounded-xl border border-line/60 bg-void/85 px-3 py-2 text-right">
@@ -320,7 +320,7 @@ function PlanetStage({ planet, earthYears, alienYears, compact = false, onGoHome
                   <span className="h-1.5 w-1.5 rounded-full" style={{ background: look.palette[2] }} />
                   <span className="label text-[9px]">Local life</span>
                 </div>
-                <div className="num mt-0.5 text-[11px] text-ink">{alien.label}</div>
+                <div className="mt-0.5 text-[11px] text-ink">{alien.label}</div>
               </div>
             )}
           </>

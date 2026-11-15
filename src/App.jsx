@@ -7,9 +7,10 @@ import JourneyStage from './components/JourneyStage'
 import Debrief from './components/Debrief'
 import AboutDialog from './components/AboutDialog'
 import RelativityLab from './components/lab/RelativityLab'
-import { DEFAULT_PLANET } from './lib/catalog'
 import { simulateMission } from './lib/physics'
 import { emptySimulation, loadSimulation, recordMission, saveSimulation } from './lib/simulation'
+import { DEFAULT_PLANET, EARTH, distanceLyBetween, nearbyPlanets } from './lib/catalog'
+
 
 export default function App() {
   const [step, setStep] = useState('destination')

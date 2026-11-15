@@ -22,7 +22,7 @@ function SpeedField({ beta, onChange }) {
         step="0.1"
         inputMode="decimal"
         aria-label="Cruise speed as a percentage of the speed of light"
-        className="field num w-24 text-center"
+        className="field w-24 text-center"
         value={text}
         onChange={(event) => {
           const next = event.target.value
@@ -87,16 +87,16 @@ export default function FlightPlan({
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="label">Cruise speed</div>
-              <div className="num mt-1 text-4xl font-semibold tracking-tight text-ink">
+              <div className="mt-1 text-4xl font-semibold tracking-tight text-ink">
                 {beta.toFixed(3)}<span className="ml-1 text-lg text-ink/60">c</span>
               </div>
-              <div className="num mt-1 text-[11px] text-ink/55">
+              <div className="mt-1 text-[11px] text-ink/55">
                 {formatNumber(beta * C_KM_S, 0)} km/s
               </div>
             </div>
             <div className="rounded-lg border border-line/50 bg-void/60 px-2.5 py-1.5 text-right">
               <div className="text-[9px] tracking-[0.14em] text-ink/50 uppercase">Lorentz factor</div>
-              <div className="num text-[11px] text-ink/60">γ hidden until arrival</div>
+              <div className="text-[11px] text-ink/60">γ hidden until arrival</div>
             </div>
           </div>
 
@@ -215,17 +215,17 @@ export default function FlightPlan({
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-ink/55">Distance</dt>
-                <dd className="num text-right text-ink">
+                <dd className="text-right text-ink">
                   {formatNumber(distanceLy, distanceLy < 1 ? 5 : 2)} ly
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-ink/55">Cruise speed</dt>
-                <dd className="num text-right text-ink">{beta.toFixed(3)} c</dd>
+                <dd className="text-right text-ink">{beta.toFixed(3)} c</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-ink/55">Light-travel time</dt>
-                <dd className="num text-right text-ink">{formatYears(distanceLy)}</dd>
+                <dd className="text-right text-ink">{formatYears(distanceLy)}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-ink/55">World type</dt>

@@ -68,7 +68,7 @@ export default function PlanetSearch({
       <div className="mb-1.5 flex items-baseline justify-between gap-2">
         <span className="label">{label}</span>
         {value && (
-          <span className="num text-[10px] text-ink/55">
+          <span className="text-[10px] text-ink/55">
             {value.star}
             {distanceFor ? ` · ${formatNumber(distanceFor(value), 2)} ly ${distanceLabel}` : ''}
           </span>
@@ -131,7 +131,7 @@ export default function PlanetSearch({
               <span className="text-[9px] tracking-[0.16em] text-ink/50 uppercase">
                 {query.trim() ? 'Matches' : 'Nearest worlds'}
               </span>
-              <span className="num text-[10px] text-ink/50">{options.length}</span>
+              <span className="text-[10px] text-ink/50">{options.length}</span>
             </div>
             <ul id={`${id}-listbox`} role="listbox" className="max-h-64 overflow-auto p-1">
               {options.map((option, index) => {
@@ -146,9 +146,8 @@ export default function PlanetSearch({
                       onMouseDown={(event) => event.preventDefault()}
                       onMouseEnter={() => setActive(index)}
                       onClick={() => choose(option)}
-                      className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition ${
-                        index === active ? 'bg-panel/60' : 'hover:bg-panel/35'
-                      }`}
+                      className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition ${index === active ? 'bg-panel/60' : 'hover:bg-panel/35'
+                        }`}
                     >
                       <span
                         className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -161,7 +160,7 @@ export default function PlanetSearch({
                         </span>
                       </span>
                       {distanceFor && (
-                        <span className="num shrink-0 text-[10px] text-ink/55">
+                        <span className="shrink-0 text-[10px] text-ink/55">
                           {formatNumber(distanceFor(option), 2)} ly
                         </span>
                       )}

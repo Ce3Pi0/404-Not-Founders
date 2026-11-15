@@ -290,18 +290,18 @@ function JourneyStage({ origin, planet, mission, shipName, onArrive }) {
             <h2 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
               {origin.name} <span className="text-ink/45">→</span> {planet.name}
             </h2>
-            <div className="num mt-1 text-[11px] text-ink/60">
+            <div className="mt-1 text-[11px] text-ink/60">
               {shipName} · {formatNumber(mission.distanceLy, 2)} ly
             </div>
           </div>
           <div className="flex flex-col items-end gap-1">
-            <span className="num rounded-full border border-line/70 bg-void/85 px-3 py-1 text-[11px] text-ink">
+            <span className="rounded-full border border-line/70 bg-void/85 px-3 py-1 text-[11px] text-ink">
               {mission.beta.toFixed(3)} c · {formatNumber(mission.beta * C_KM_S, 0)} km/s
             </span>
-            <span className="num rounded-full border border-line/60 bg-void/85 px-3 py-1 text-[11px] text-ink/70">
+            <span className="rounded-full border border-line/60 bg-void/85 px-3 py-1 text-[11px] text-ink/70">
               travelled {formatNumber(travelled, mission.distanceLy < 1 ? 5 : 2)} ly
             </span>
-            <span className="num rounded-full border border-line/60 bg-void/85 px-3 py-1 text-[11px] text-ink/70">
+            <span className="rounded-full border border-line/60 bg-void/85 px-3 py-1 text-[11px] text-ink/70">
               remaining {formatNumber(remaining, mission.distanceLy < 1 ? 5 : 2)} ly
             </span>
           </div>
@@ -310,13 +310,13 @@ function JourneyStage({ origin, planet, mission, shipName, onArrive }) {
         <div className="pointer-events-none absolute inset-x-4 bottom-4 grid grid-cols-2 gap-3">
           <div className="rounded-xl border border-line/60 bg-void/85 px-4 py-3">
             <div className="label text-[9px]">Earth frame</div>
-            <div className="num mt-1 text-xl font-semibold text-ink sm:text-2xl">{formatYears(earthNow)}</div>
-            <div className="num mt-0.5 text-[10px] text-ink/60">{formatDays(earthNow)}</div>
+            <div className="mt-1 text-xl font-semibold text-ink sm:text-2xl">{formatYears(earthNow)}</div>
+            <div className="mt-0.5 text-[10px] text-ink/60">{formatDays(earthNow)}</div>
           </div>
           <div className="rounded-xl border border-line/70 bg-panel/60 px-4 py-3">
             <div className="label text-[9px] text-ink/60">{shipName} frame</div>
-            <div className="num mt-1 text-xl font-semibold text-ink sm:text-2xl">{formatYears(shipNow)}</div>
-            <div className="num mt-0.5 text-[10px] text-ink/60">{formatDays(shipNow)}</div>
+            <div className="mt-1 text-xl font-semibold text-ink sm:text-2xl">{formatYears(shipNow)}</div>
+            <div className="mt-0.5 text-[10px] text-ink/60">{formatDays(shipNow)}</div>
           </div>
         </div>
 
@@ -337,7 +337,7 @@ function JourneyStage({ origin, planet, mission, shipName, onArrive }) {
               style={{ width: `${progress * 100}%` }}
             />
           </div>
-          <div className="num mt-2 text-[10px] text-ink/50">
+          <div className="mt-2 text-[10px] text-ink/50">
             1 s of playback ≈ {formatYears(compression)} of mission time
           </div>
         </div>
