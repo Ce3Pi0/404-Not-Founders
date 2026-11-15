@@ -4,15 +4,16 @@ const SECTIONS = [
   {
     title: 'What this is',
     body: [
-      'Beyond Time turns Einstein\'s relativity into a mission you fly. Pick a real exoplanet, set a cruise speed, launch, and compare the clock in the crew cabin with the clock back on Earth.',
-      'This is the first playable draft for Hack The Nest: one-way constant-velocity cruises, accumulating crew time, and a debrief that shows the arithmetic behind what you just saw.',
+      'Beyond Time turns Einstein\'s relativity into a mission you fly. Choose where you are and where you are going — Earth to an exoplanet, exoplanet to exoplanet, or back home — set a cruise speed, launch, and compare the clock in the crew cabin with the clock you left behind.',
+      'This is the second playable draft for Hack The Nest: constant-velocity cruises between any two archived systems, accumulating crew time, and a debrief that shows the arithmetic behind what you just saw.',
     ],
   },
   {
     title: 'Where the planets come from',
     body: [
-      'Every destination comes from NASA\'s Exoplanet Archive, planetary systems composite parameters table. Distances, radii, masses, equilibrium temperatures, orbital geometry and host-star properties are measured or derived values published by the archive.',
-      'Parsecs are converted to light years (1 pc = 3.2616 ly). A handful of archive fields are blank for some worlds; those read "—" rather than being invented.',
+      'The catalogue is a direct extract of NASA\'s Exoplanet Archive CSV: planet name, host star, right ascension, declination, system distance in parsecs, orbital semi-major axis and orbital period. That file is the single source of truth for the app — 6,442 planets across thousands of systems.',
+      'Route lengths come from real three-dimensional positions: each system is placed at its RA/Dec and distance from the Sun, so a trip between two exoplanets is the straight-line distance between those two points. Parsecs are converted to light years (1 pc = 3.2616 ly).',
+      'The archive extract does not carry planet radii, masses, temperatures or host-star data, so those are derived: stellar mass follows from Kepler\'s third law using the orbital period and semi-major axis, and equilibrium temperature follows from the resulting luminosity. Those derived values are labelled as estimates.',
     ],
   },
   {
@@ -26,8 +27,8 @@ const SECTIONS = [
   {
     title: 'Why planets look the way they do',
     body: [
-      'Colour is not in the archive. Each world\'s surface palette is inferred from its bulk properties — equilibrium temperature, density, radius and mass — which is why hot Jupiters read banded and amber while cold worlds read pale and icy.',
-      'When a world is missing the temperature or radius needed for that inference, the palette is estimated (or randomized as a last resort) and marked with an asterisk in the interface. Treat those colours as illustration, not observation.',
+      'Colour is not in the archive. Each world\'s surface palette is inferred from its estimated equilibrium temperature, radius and density — which is why hot worlds read molten while cold ones read pale and icy. Figures on the planet surface are drawn at a readable scale, not a physically literal one.',
+      'The host star is rendered at its true apparent angular size as seen from the planet\'s orbit, so a close-in world gets a sun that fills the sky and a distant one gets a small disc. Treat every surface detail as illustration, not observation.',
     ],
   },
   {
@@ -95,7 +96,7 @@ export default function AboutDialog({ open, onClose }) {
         <div className="mt-5 space-y-5">
           {SECTIONS.map((section) => (
             <section key={section.title}>
-              <h3 className="text-[11px] font-semibold tracking-[0.16em] text-ion uppercase">
+              <h3 className="text-[11px] font-semibold tracking-[0.16em] text-ink/70 uppercase">
                 {section.title}
               </h3>
               <div className="mt-1.5 space-y-2 text-[12px] leading-relaxed text-muted">

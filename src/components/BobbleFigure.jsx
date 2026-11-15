@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import SkeletonFigure from './SkeletonFigure'
 
 const SHAPES = {
   baby: { legH: 0.08, bodyH: 0.2, bodyW: 0.3, headR: 0.3, armL: 0.12 },
@@ -34,10 +35,10 @@ export default function BobbleFigure({
   const headY = legH + bodyH + headR * 0.82
   const bodyY = legH + bodyH / 2
   const armY = legH + bodyH * 0.72
-  const bodyColor = skeleton ? '#e7e1d2' : human ? '#1e2c3e' : accent
-  const headColor = skeleton ? '#efe9da' : human ? skin : accent
-  const hairColor = skeleton ? null : human ? (elderly ? '#d5dbe2' : '#2a1c15') : null
-  const limbRadius = skeleton ? 0.026 : 0.045
+  const bodyColor = human ? '#4c0070' : accent
+  const headColor = human ? skin : accent
+  const hairColor = human ? (elderly ? '#ffffff' : '#2a1c15') : null
+  const limbRadius = 0.045
 
   useFrame(({ clock }) => {
     if (!bob.current) return
@@ -45,6 +46,20 @@ export default function BobbleFigure({
     bob.current.position.y = Math.sin(t * 1.5) * 0.035
     bob.current.rotation.z = Math.sin(t * 1.05) * 0.04
   })
+
+  if (skeleton) {
+    return (
+      <group position={position} scale={scale}>
+        <group ref={bob}>
+          <SkeletonFigure shape={shape} species={species} accent={accent} />
+          <mesh position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[bodyW * 0.95, 24]} />
+            <meshBasicMaterial color="#160040" transparent opacity={0.5} depthWrite={false} />
+          </mesh>
+        </group>
+      </group>
+    )
+  }
 
   return (
     <group position={position} scale={scale}>
@@ -64,21 +79,10 @@ export default function BobbleFigure({
         </mesh>
 
         {/* suit detail */}
-        {!skeleton && (
-          <mesh position={[0, bodyY + bodyH * 0.12, bodyW * 0.42]}>
-            <boxGeometry args={[bodyW * 0.5, 0.035, 0.02]} />
-            <meshStandardMaterial color={human ? accent : '#f6fbff'} emissive={human ? accent : '#000000'} emissiveIntensity={0.35} roughness={0.4} />
-          </mesh>
-        )}
-
-        {/* skeleton ribs */}
-        {skeleton &&
-          [0.12, 0.28, 0.44].map((offset) => (
-            <mesh key={`rib-${offset}`} position={[0, legH + bodyH * offset, 0.01]}>
-              <torusGeometry args={[bodyW * 0.34, 0.012, 6, 16]} />
-              <meshStandardMaterial color="#dcd5c4" roughness={0.8} />
-            </mesh>
-          ))}
+        <mesh position={[0, bodyY + bodyH * 0.12, bodyW * 0.42]}>
+          <boxGeometry args={[bodyW * 0.5, 0.035, 0.02]} />
+          <meshStandardMaterial color={human ? accent : '#ffffff'} emissive={human ? accent : '#000000'} emissiveIntensity={0.35} roughness={0.4} />
+        </mesh>
 
         {/* arms */}
         {[-1, 1].map((side) => (
@@ -105,8 +109,8 @@ export default function BobbleFigure({
             position={[side * headR * (human ? 0.34 : 0.38), headY + headR * 0.08, headR * 0.84]}
             scale={human ? [1, 1, 1] : [1.4, 1.1, 1]}
           >
-            <sphereGeometry args={[headR * (skeleton ? 0.12 : human ? 0.1 : 0.15), 14, 14]} />
-            <meshStandardMaterial color={skeleton ? '#141414' : '#101820'} roughness={0.25} />
+            <sphereGeometry args={[headR * (human ? 0.1 : 0.15), 14, 14]} />
+            <meshStandardMaterial color="#160040" roughness={0.25} />
           </mesh>
         ))}
 
@@ -142,7 +146,7 @@ export default function BobbleFigure({
         {/* contact shadow */}
         <mesh position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <circleGeometry args={[bodyW * 0.95, 24]} />
-          <meshBasicMaterial color="#000000" transparent opacity={0.32} depthWrite={false} />
+          <meshBasicMaterial color="#160040" transparent opacity={0.45} depthWrite={false} />
         </mesh>
       </group>
     </group>

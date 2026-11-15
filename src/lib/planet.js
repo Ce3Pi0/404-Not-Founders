@@ -150,7 +150,7 @@ export function classifyPlanet(planet) {
     type = 'desert'
   }
 
-  if (source !== 'random' && temp == null) source = 'estimated'
+  if (source !== 'random' && planet.bulkEstimated) source = 'estimated'
 
   const definition = TYPES[type]
   const rand = mulberry32(hashString(planet.name))
@@ -160,7 +160,6 @@ export function classifyPlanet(planet) {
   const evidence = []
   if (temp != null) evidence.push(`${Math.round(temp)} K equilibrium temperature`)
   if (density != null) evidence.push(`${density} g/cm³ density`)
-  else if (planet.massEarth != null) evidence.push(`${planet.massEarth} M⊕ mass`)
   if (radius != null) evidence.push(`${radius} R⊕ radius`)
 
   return {
@@ -172,10 +171,8 @@ export function classifyPlanet(planet) {
     source,
     evidence:
       source === 'random'
-        ? 'No radius or temperature in the archive — appearance randomized.'
-        : source === 'estimated'
-          ? 'No equilibrium temperature in the archive — appearance estimated from bulk properties.'
-          : `Inferred from ${evidence.join(', ')}.`,
+        ? 'No orbital data in the archive — appearance randomized.'
+        : `Estimated from the archive's orbital data — ${evidence.join(', ')}.`,
   }
 }
 
@@ -489,18 +486,3 @@ export function createPlanetTexture(planet) {
 
   return { texture, look }
 }
-
-export const HIGHLIGHTS = [
-  { name: 'Proxima Cen b', note: 'Closest known exoplanet' },
-  { name: 'TRAPPIST-1 e', note: 'Rocky world in the habitable zone' },
-  { name: 'Kepler-452 b', note: "Earth's older cousin" },
-  { name: 'HD 209458 b', note: 'First transiting exoplanet' },
-  { name: 'WASP-12 b', note: 'Ultra-hot Jupiter' },
-  { name: 'KELT-9 b', note: 'Hottest known planet' },
-  { name: 'Kepler-16 b', note: 'Orbits two suns' },
-  { name: '55 Cnc e', note: 'Lava world' },
-  { name: 'Kepler-51 d', note: 'Super-puff density' },
-  { name: 'PSR B1257+12 b', note: 'Pulsar planet' },
-  { name: 'TOI-700 d', note: 'Nearby temperate world' },
-  { name: 'GJ 1214 b', note: 'Steamy water world' },
-]

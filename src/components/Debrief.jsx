@@ -94,7 +94,7 @@ function PhysicsCard({ mission, planet }) {
         </div>
         <div>
           <span className="text-muted">t_ship = t⊕/γ</span> ={' '}
-          <span className="text-ion">{formatNumber(mission.shipYears, 3)} yr</span>
+          <span className="text-ink">{formatNumber(mission.shipYears, 3)} yr</span>
         </div>
         <div>
           <span className="text-muted">Δ</span> = {formatNumber(mission.driftYears, 3)} yr of separation
@@ -154,7 +154,7 @@ function PhysicsCard({ mission, planet }) {
   )
 }
 
-function MissionLog({ sim, onNext, onReset }) {
+function MissionLog({ sim, planet, onNext, onReset, onGoHome }) {
   return (
     <section className="panel p-5">
       <div className="flex items-baseline justify-between gap-3">
@@ -171,13 +171,16 @@ function MissionLog({ sim, onNext, onReset }) {
           {sim.missions.slice(0, 6).map((entry) => (
             <li key={entry.id} className="flex items-baseline justify-between gap-3 py-2">
               <div className="min-w-0">
-                <div className="truncate text-[12px] text-ink">{entry.planet}</div>
+                <div className="truncate text-[12px] text-ink">
+                  {entry.origin ? `${entry.origin} → ` : ''}
+                  {entry.planet}
+                </div>
                 <div className="num text-[10px] text-muted">
                   {entry.beta.toFixed(3)} c · {formatNumber(entry.distanceLy, 2)} ly
                 </div>
               </div>
               <div className="num shrink-0 text-right text-[10px]">
-                <div className="text-ion">{formatYears(entry.shipYears)} ship</div>
+                <div className="text-ink">{formatYears(entry.shipYears)} ship</div>
                 <div className="text-muted">{formatYears(entry.earthYears)} Earth</div>
               </div>
             </li>
@@ -188,7 +191,7 @@ function MissionLog({ sim, onNext, onReset }) {
       <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-line/70 bg-void/40 px-3 py-2">
         <span className="text-[10px] tracking-[0.14em] text-muted uppercase">Total elapsed</span>
         <span className="num text-[11px] text-ink">
-          <span className="text-ion">{formatYears(sim.shipYears)}</span>
+          <span className="text-ink">{formatYears(sim.shipYears)}</span>
           <span className="text-muted"> ship · </span>
           {formatYears(sim.earthYears)} Earth
         </span>
@@ -198,6 +201,11 @@ function MissionLog({ sim, onNext, onReset }) {
         <button type="button" className="btn btn-primary flex-1" onClick={onNext}>
           Plan another mission →
         </button>
+        {planet.kind !== 'earth' && onGoHome && (
+          <button type="button" className="btn" onClick={onGoHome}>
+            ← Go home
+          </button>
+        )}
         <button type="button" className="btn" onClick={onReset}>
           Reset
         </button>
@@ -206,7 +214,7 @@ function MissionLog({ sim, onNext, onReset }) {
   )
 }
 
-export default function Debrief({ mission, planet, prediction, sim, onNext, onReset }) {
+export default function Debrief({ mission, planet, origin, prediction, sim, onNext, onReset, onGoHome }) {
   const look = classifyPlanet(planet)
   const ratio = mission.gamma
 
@@ -218,14 +226,14 @@ export default function Debrief({ mission, planet, prediction, sim, onNext, onRe
           <h1 className="mt-1 text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
             Welcome to {planet.name}
           </h1>
-          <p className="mt-1 text-[13px] text-muted">
-            {look.label} · {formatNumber(planet.distanceLy, 2)} ly from Earth · {mission.shipName} at{' '}
-            {mission.beta.toFixed(3)} c
+          <p className="mt-1 text-[13px] text-ink/65">
+            {mission.origin} <span className="text-ink/45">→</span> {planet.name} ·{' '}
+            {formatNumber(mission.distanceLy, 2)} ly · {mission.shipName} at {mission.beta.toFixed(3)} c
           </p>
         </div>
-        <div className="rounded-xl border border-ion/30 bg-ion/[0.06] px-3 py-2 text-right">
-          <div className="text-[9px] tracking-[0.16em] text-ion/80 uppercase">Time dilation</div>
-          <div className="num text-lg font-semibold text-ion">{ratio.toFixed(2)}×</div>
+        <div className="rounded-xl border border-line/60 bg-panel/40 px-3 py-2 text-right">
+          <div className="text-[9px] tracking-[0.16em] text-ink/60 uppercase">Time dilation</div>
+          <div className="num text-lg font-semibold text-ink">{ratio.toFixed(2)}×</div>
         </div>
       </div>
 
@@ -239,13 +247,13 @@ export default function Debrief({ mission, planet, prediction, sim, onNext, onRe
           label={`${mission.shipName} elapsed`}
           value={formatYears(mission.shipYears)}
           sub={formatDays(mission.shipYears)}
-          tone="text-ion"
+          tone="text-ink"
         />
         <Stat
           label="Crew aged less by"
           value={formatYears(mission.driftYears)}
           sub={`${formatNumber(mission.driftYears * 365.25, 0)} days`}
-          tone="text-solar"
+          tone="text-ink"
         />
       </div>
 
@@ -256,7 +264,7 @@ export default function Debrief({ mission, planet, prediction, sim, onNext, onRe
         </div>
         <div className="min-w-0 space-y-4">
           <PhysicsCard mission={mission} planet={planet} />
-          <MissionLog sim={sim} onNext={onNext} onReset={onReset} />
+          <MissionLog sim={sim} planet={planet} onNext={onNext} onReset={onReset} onGoHome={onGoHome} />
         </div>
       </div>
     </div>

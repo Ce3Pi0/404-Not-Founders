@@ -34,6 +34,7 @@ export function recordMission(simulation, mission) {
     missions: [
       {
         id: `${mission.planet}-${Date.now()}`,
+        origin: mission.origin,
         planet: mission.planet,
         shipName: mission.shipName,
         beta: mission.beta,
