@@ -377,6 +377,21 @@ export default function AdvancedParameters({
             <Value label="Time cruising" value={formatYears(model.cruiseYears)} note="Earth frame" />
             <Value label="Time braking" value={formatYears(model.brakeYears)} note="Earth frame" />
             <Value
+              label="Acceleration ship time"
+              value={formatYears(model.shipAccelYears)}
+              note="proper time"
+            />
+            <Value
+              label="Cruise ship time"
+              value={formatYears(model.shipCruiseYears)}
+              note="proper time"
+            />
+            <Value
+              label="Braking ship time"
+              value={formatYears(model.shipBrakeYears)}
+              note="proper time"
+            />
+            <Value
               label="Total Earth-reference time"
               value={formatYears(model.earthYears)}
               strong

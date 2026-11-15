@@ -26,6 +26,7 @@ import {
   continueExpedition,
   createExpedition,
   expeditionSummary,
+  legPhaseClocks,
   remainingRouteEstimate,
   surveyPlanet,
 } from '../src/lib/challenge/engine.js'
@@ -358,4 +359,110 @@ test('budgets and cruise speeds stay inside the challenge range', () => {
   })
   assert.equal(route.legs[0].beta, BETA_MIN)
   assert.equal(route.legs[1].beta, BETA_MAX)
+})
+
+/* ------------------------------------------- advanced-SR live execution -- */
+
+function advancedRoute(stops, legSpeeds = {}) {
+  return assembleExpedition(stops, legSpeeds, {
+    advanced: true,
+    config: { accelMs: 9.80665 },
+  })
+}
+
+test('advanced expedition: both clocks advance through acceleration, cruise and braking', () => {
+  const x = rocky('x', 'Planet X', 5, 1.5)
+  const route = advancedRoute([stop('Alpha', [4, 0, 0], x)], { 0: 0.6, 1: 0.6 })
+  const leg = route.legs[0]
+  const clocks = legPhaseClocks(leg)
+  assert.ok(clocks.acceleration.earthYears > 0)
+  assert.ok(clocks.cruise.earthYears > 0)
+  assert.ok(clocks.deceleration.earthYears > 0)
+
+  let state = launch(route, 5, 500)
+  const grew = { acceleration: false, cruise: false, deceleration: false }
+  for (let i = 0; i < 4000 && state.status === STATUS.ACTIVE; i += 1) {
+    const phase = state.currentPhase
+    const earth = state.earthTimeElapsed
+    const ship = state.shipTimeElapsed
+    state = advanceExpedition(state, 0.02)
+    if (grew[phase] !== undefined && state.earthTimeElapsed > earth + 1e-12) {
+      grew[phase] = true
+      assert.ok(state.shipTimeElapsed > ship, `${phase} must age the crew too`)
+    }
+  }
+
+  assert.equal(state.status, STATUS.SURVEYING)
+  assert.deepEqual(grew, { acceleration: true, cruise: true, deceleration: true })
+  close(state.earthTimeElapsed, leg.earthYears, 1e-9)
+  close(state.shipTimeElapsed, leg.shipYears, 1e-9)
+
+  // Finite burns cost real time in both frames: the constant-speed result is
+  // not what this leg flew.
+  const simpleShip = leg.distanceLy / leg.beta / lorentzFactor(leg.beta)
+  assert.ok(state.shipTimeElapsed > simpleShip)
+})
+
+test('advanced expedition: the Earth deadline is checked during acceleration', () => {
+  const x = rocky('x', 'Planet X', 5, 1.5)
+  const route = advancedRoute([stop('Alpha', [4, 0, 0], x)], { 0: 0.6, 1: 0.6 })
+  const accelYears = legPhaseClocks(route.legs[0]).acceleration.earthYears
+  const budget = accelYears * 0.5
+  const state = runUntilStopped(launch(route, 5, budget))
+
+  assert.equal(state.status, STATUS.FAILED)
+  assert.equal(state.failure.reason, 'time')
+  assert.equal(state.failure.phase, 'acceleration')
+  close(state.earthTimeElapsed, budget, 1e-9)
+  assert.equal(state.legProgress, 0, 'the ship stays at the start of the leg')
+  assert.ok(state.failure.shortfallYears > 0)
+})
+
+test('advanced expedition: the Earth deadline is checked during braking', () => {
+  const x = rocky('x', 'Planet X', 5, 1.5)
+  const route = advancedRoute([stop('Alpha', [4, 0, 0], x)], { 0: 0.6, 1: 0.6 })
+  const leg = route.legs[0]
+  const brakeYears = legPhaseClocks(leg).deceleration.earthYears
+  const budget = leg.earthYears - brakeYears * 0.5
+  const state = runUntilStopped(launch(route, 5, budget))
+
+  assert.equal(state.status, STATUS.FAILED)
+  assert.equal(state.failure.reason, 'time')
+  assert.equal(state.failure.phase, 'deceleration')
+  close(state.earthTimeElapsed, budget, 1e-9)
+  assert.ok(state.legProgress > 0.9 && state.legProgress < 1)
+})
+
+test('Test F — a three-leg advanced expedition totals the sum of its legs', () => {
+  const x = rocky('x', 'Planet X', 5, 1.5)
+  const y = rocky('y', 'Planet Y', 3, 1.2)
+  const stops = [stop('Alpha', [4, 0, 0], x), stop('Beta', [0, 5, 0], y)]
+  const base = advancedRoute(stops)
+  const speeds = {}
+  const betas = [0.7, 0.8, 0.6]
+  base.legs.forEach((leg, index) => {
+    speeds[leg.key] = betas[index]
+  })
+  const route = advancedRoute(stops, speeds)
+  assert.equal(route.legs.length, 3)
+  assert.equal(route.legs.filter((leg) => leg.toSystem === 'Solar System').length, 1)
+
+  let state = launch(route, route.totalEnergy + 1, route.totalEarthYears + 10)
+  state = runUntilStopped(state)
+  assert.equal(state.status, STATUS.SURVEYING)
+  state = surveyPlanet(state, 'x')
+  state = continueExpedition(state)
+  state = runUntilStopped(state)
+  assert.equal(state.status, STATUS.SURVEYING)
+  state = surveyPlanet(state, 'y')
+  state = continueExpedition(state)
+  state = runUntilStopped(state)
+  assert.equal(state.status, STATUS.SUCCESS)
+
+  const summary = expeditionSummary(state)
+  const legEarth = route.legs.reduce((sum, leg) => sum + leg.earthYears, 0)
+  const legShip = route.legs.reduce((sum, leg) => sum + leg.shipYears, 0)
+  close(summary.earthYears, legEarth + 2 * SURVEY_YEARS, 1e-6)
+  close(summary.shipYears, legShip + 2 * SURVEY_YEARS, 1e-6)
+  assert.ok(summary.shipYears < summary.earthYears)
 })

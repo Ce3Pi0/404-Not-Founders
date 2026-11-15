@@ -7,8 +7,8 @@
 // separate: whatever playback speed is chosen, the physical durations stored
 // in the mission stay exactly what the Travel Planner calculated.
 
-import { C_KM_S } from './physics'
-import { trajectoryAt } from './advancedSR'
+import { C_KM_S } from './physics.js'
+import { trajectoryAt } from './advancedSR.js'
 
 /** Seconds of playback for a whole trip at 1× speed. */
 export const FLIGHT_TIMELINE_SECONDS = 24

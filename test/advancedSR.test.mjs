@@ -20,6 +20,7 @@ import {
   trajectoryAt,
 } from '../src/lib/advancedSR.js'
 import { simulateMission } from '../src/lib/physics.js'
+import { missionClock } from '../src/lib/flight.js'
 import { assembleExpedition, groupStops } from '../src/lib/challenge/assemble.js'
 
 const close = (actual, expected, tolerance = 1e-9) => {
@@ -294,4 +295,81 @@ test('challenge route: each leg is computed once with the advanced engine', () =
   assert.ok(route.legs.every((leg) => leg.betaPeak === leg.beta))
   assert.ok(Math.abs(route.legs[0].earthYears - simple.legs[0].earthYears) > 1e-6)
   assert.ok(route.legs[0].shipYears > simple.legs[0].shipYears)
+})
+
+/* ------------------------------------------------- the brief's acceptance -- */
+
+test('Test A — simple SR: 10 ly at 0.8c is 12.5 yr Earth, 7.5 yr ship', () => {
+  const result = simulateMission(10, 0.8)
+  close(result.earthYears, 12.5, 1e-12)
+  close(result.shipYears, 7.5, 1e-12)
+  close(result.gamma, 5 / 3, 1e-12)
+})
+
+test('Test B — advanced SR: 10 ly, 0.8c, 9.80665 m/s² gives 13.47 / 8.66 yr', () => {
+  const model = advancedJourney({ distanceLy: 10, beta: 0.8, accelMs: 9.80665 })
+  assert.equal(model.reachedTarget, true)
+  close(model.betaPeak, 0.8, 1e-12)
+  close(model.earthYears, 13.47, 1e-3)
+  close(model.shipYears, 8.66, 1e-3)
+  // The finite burns cost real time in both frames. Neither clock is the
+  // constant-speed answer, and the ship clock is never t_earth / γ_peak.
+  const simple = simulateMission(10, 0.8)
+  assert.ok(model.earthYears > simple.earthYears)
+  assert.ok(model.shipYears > simple.shipYears)
+  assert.ok(Math.abs(model.earthYears / model.gammaPeak - model.shipYears) > 1e-6)
+  // Phase clocks add up to the totals in both frames.
+  close(model.accelYears + model.cruiseYears + model.brakeYears, model.earthYears, 1e-12)
+  close(model.shipAccelYears + model.shipCruiseYears + model.shipBrakeYears, model.shipYears, 1e-12)
+})
+
+const advancedMission = (scenario) => {
+  const model = advancedJourney(scenario)
+  return {
+    mode: 'advanced',
+    advanced: model,
+    beta: model.betaPeak,
+    gamma: model.gammaPeak,
+    earthYears: model.earthYears,
+    shipYears: model.shipYears,
+    distanceLy: model.distanceLy,
+  }
+}
+
+test('Test D — the live clocks land exactly on the engine totals', () => {
+  const mission = advancedMission({ distanceLy: 10, beta: 0.8, accelMs: 9.80665 })
+  const end = missionClock(mission, 1)
+  close(end.earthYears, mission.advanced.earthYears, 1e-12)
+  close(end.shipYears, mission.advanced.shipYears, 1e-12)
+  close(end.travelledLy, mission.distanceLy, 1e-9)
+  close(end.driftYears, mission.advanced.driftYears, 1e-9)
+  // The first and last instants are at rest; the peak is in the middle.
+  assert.equal(missionClock(mission, 0).beta, 0)
+  assert.equal(end.beta, 0)
+  assert.ok(missionClock(mission, 0.5).beta > 0.79)
+})
+
+test('Test E — playback sampling and camera changes never move the clocks', () => {
+  const mission = advancedMission({ distanceLy: 10, beta: 0.8, accelMs: 9.80665 })
+  const endAfter = (steps) => {
+    let last = null
+    for (let i = 1; i <= steps; i += 1) last = missionClock(mission, i / steps)
+    return last
+  }
+  // Same fraction of the voyage reached by a slow step and a fast step: the
+  // clock depends only on progress, never on how the animation got there.
+  const coarse = endAfter(24)
+  const fine = endAfter(2400)
+  close(coarse.earthYears, fine.earthYears, 1e-12)
+  close(coarse.shipYears, fine.shipYears, 1e-12)
+  close(coarse.earthYears, mission.advanced.earthYears, 1e-12)
+  close(coarse.shipYears, mission.advanced.shipYears, 1e-12)
+
+  // A pause is the same progress re-read, and the mid-flight sample is stable.
+  const mid = missionClock(mission, 0.437)
+  const again = missionClock(mission, 0.437)
+  close(mid.earthYears, again.earthYears, 1e-12)
+  close(mid.shipYears, again.shipYears, 1e-12)
+  // During acceleration the ship clock is not Earth time divided by peak γ.
+  assert.ok(Math.abs(mid.shipYears - mid.earthYears / mission.gamma) > 1e-9)
 })

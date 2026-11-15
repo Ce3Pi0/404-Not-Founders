@@ -7,8 +7,10 @@
 //
 // Failure is detected *here*, during execution — never in preflight. Energy is
 // deducted only as a burn runs out, and the Earth clock is checked on every
-// tick. Remaining resources are clamped at zero and the state freezes on the
-// exact leg and phase where the expedition stopped.
+// tick, in every phase: with advanced SR the ship really does spend time
+// accelerating and braking, so those phases carry their share of both clocks.
+// Remaining resources are clamped at zero and the state freezes on the exact
+// leg and phase where the expedition stopped.
 
 import { ENERGY_EPS, TIME_EPS, SURVEY_YEARS } from './physics.js'
 
@@ -104,41 +106,80 @@ function spendEnergy(state, amount, bucket, phase) {
   return next
 }
 
-/** Earth-clock advance during cruise, with the deadline checked mid-tick. */
-function advanceCruise(state, delta) {
+/**
+ * A leg's Earth and ship time split across the three interstellar phases.
+ *
+ * Simple SR has instantaneous acceleration and braking, so the speed and the
+ * Lorentz factor are constant and every year of the leg belongs to cruise.
+ * Advanced SR flies the accelerate–cruise–brake solution, so each phase owns
+ * its own share of both clocks. Either way the shares sum to the leg's totals,
+ * so the expedition forecast never changes.
+ */
+export function legPhaseClocks(leg) {
+  const model = leg?.physicsMode === 'advanced' ? leg.advanced : null
+  if (model) {
+    return {
+      [PHASE.ACCELERATION]: { earthYears: model.accelYears, shipYears: model.shipAccelYears },
+      [PHASE.CRUISE]: { earthYears: model.cruiseYears, shipYears: model.shipCruiseYears },
+      [PHASE.DECELERATION]: { earthYears: model.brakeYears, shipYears: model.shipBrakeYears },
+    }
+  }
+  return {
+    [PHASE.ACCELERATION]: { earthYears: 0, shipYears: 0 },
+    [PHASE.CRUISE]: { earthYears: leg?.earthYears ?? 0, shipYears: leg?.shipYears ?? 0 },
+    [PHASE.DECELERATION]: { earthYears: 0, shipYears: 0 },
+  }
+}
+
+/** Where the ship sits along the leg during each phase (visual only). */
+function legProgressFor(phase, phaseProgress) {
+  if (phase === PHASE.CRUISE) return phaseProgress * 0.9
+  if (phase === PHASE.DECELERATION) return 0.9 + phaseProgress * 0.1
+  return 0
+}
+
+/**
+ * Advance both clocks through one phase tick, with the Earth deadline checked
+ * mid-tick. The ship's proper time accumulates from that phase's own share of
+ * the leg, so acceleration and braking never borrow the cruise Lorentz factor.
+ */
+function advanceClocks(state, phase, delta) {
   const leg = state.route.legs[state.currentLegIndex]
   if (!leg) return state
-  const cruiseProgress = Math.min(1, state.phaseProgress + delta)
-  const fraction = cruiseProgress - state.phaseProgress
-  const earthDelta = leg.earthYears * fraction
-  const shipDelta = leg.shipYears * fraction
+
+  const share = legPhaseClocks(leg)[phase] ?? { earthYears: 0, shipYears: 0 }
+  const phaseProgress = Math.min(1, state.phaseProgress + delta)
+  const fraction = phaseProgress - state.phaseProgress
+  const earthDelta = share.earthYears * fraction
+  const shipDelta = share.shipYears * fraction
   const earthRemaining = Math.max(0, state.earthTimeBudget - state.earthTimeElapsed)
 
-  const next = {
-    ...state,
-    phaseProgress: cruiseProgress,
-    legProgress: cruiseProgress * 0.9,
-  }
-
   if (earthDelta + TIME_EPS < earthRemaining) {
-    next.earthTimeElapsed = state.earthTimeElapsed + earthDelta
-    next.shipTimeElapsed = state.shipTimeElapsed + shipDelta
-    return next
+    return {
+      ...state,
+      phaseProgress,
+      legProgress: legProgressFor(phase, phaseProgress),
+      earthTimeElapsed: state.earthTimeElapsed + earthDelta,
+      shipTimeElapsed: state.shipTimeElapsed + shipDelta,
+    }
   }
 
   // The deadline lands inside this tick: advance exactly to the limit, then
   // freeze the spacecraft where it was at that instant.
-  const allowed = earthRemaining / earthDelta
-  const clamped = Math.max(0, Math.min(1, allowed))
-  next.earthTimeElapsed = state.earthTimeBudget
-  next.shipTimeElapsed = state.shipTimeElapsed + shipDelta * clamped
-  next.phaseProgress = state.phaseProgress + fraction * clamped
-  next.legProgress = next.phaseProgress * 0.9
-  next.status = STATUS.FAILED
-  next.finishedAt = Date.now()
+  const allowed = earthDelta > 0 ? Math.max(0, Math.min(1, earthRemaining / earthDelta)) : 0
+  const stoppedAt = state.phaseProgress + fraction * allowed
+  const next = {
+    ...state,
+    phaseProgress: stoppedAt,
+    legProgress: legProgressFor(phase, stoppedAt),
+    earthTimeElapsed: state.earthTimeBudget,
+    shipTimeElapsed: state.shipTimeElapsed + shipDelta * allowed,
+    status: STATUS.FAILED,
+    finishedAt: Date.now(),
+  }
   next.failure = {
     reason: 'time',
-    phase: PHASE.CRUISE,
+    phase,
     legIndex: state.currentLegIndex,
     shortfallYears: remainingRouteEstimate(next).earthYears,
     shortfallEnergy: 0,
@@ -159,20 +200,15 @@ function applyPhase(state, phase, delta) {
   if (phase === PHASE.ACCELERATION) {
     const next = spendEnergy(state, leg.accelerationCost * delta, 'acceleration', phase)
     if (next.status !== STATUS.ACTIVE) return next
-    return { ...next, phaseProgress: Math.min(1, state.phaseProgress + delta) }
+    return advanceClocks(next, PHASE.ACCELERATION, delta)
   }
 
-  if (phase === PHASE.CRUISE) return advanceCruise(state, delta)
+  if (phase === PHASE.CRUISE) return advanceClocks(state, PHASE.CRUISE, delta)
 
   if (phase === PHASE.DECELERATION) {
-    const progress = Math.min(1, state.phaseProgress + delta)
-    const next = spendEnergy(
-      { ...state, phaseProgress: progress, legProgress: 0.9 + progress * 0.1 },
-      leg.brakingCost * delta,
-      'braking',
-      phase,
-    )
-    return next
+    const next = spendEnergy(state, leg.brakingCost * delta, 'braking', phase)
+    if (next.status !== STATUS.ACTIVE) return next
+    return advanceClocks(next, PHASE.DECELERATION, delta)
   }
 
   return state
@@ -450,10 +486,14 @@ export function remainingRouteEstimate(state) {
     const cruiseLeft = state.currentPhase === PHASE.CRUISE ? 1 - state.phaseProgress : 0
     const brakeLeft = state.currentPhase === PHASE.DECELERATION ? 1 - state.phaseProgress : 0
     const notYet = state.currentPhase === PHASE.IDLE
+    const clocks = legPhaseClocks(leg)
     energy += leg.gravityCost * (notYet ? 1 : escapeLeft)
     energy += leg.accelerationCost * (notYet ? 1 : accelLeft)
     energy += leg.brakingCost * (notYet ? 1 : brakeLeft)
-    earthYears += leg.earthYears * (state.currentPhase === PHASE.CRUISE ? cruiseLeft : notYet ? 1 : 0)
+    // Every phase still ahead contributes its own share of the Earth clock.
+    earthYears += clocks[PHASE.ACCELERATION].earthYears * (notYet ? 1 : accelLeft)
+    earthYears += clocks[PHASE.CRUISE].earthYears * (notYet ? 1 : cruiseLeft)
+    earthYears += clocks[PHASE.DECELERATION].earthYears * (notYet ? 1 : brakeLeft)
     for (let index = state.currentLegIndex + 1; index < legs.length; index += 1) {
       energy += legs[index].totalEnergyCost
       earthYears += legs[index].earthYears

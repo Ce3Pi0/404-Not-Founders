@@ -397,9 +397,10 @@ export default function ExpeditionFlight() {
       </div>
 
       <p className="text-[9px] leading-relaxed text-ink/40">
-        Burn sequences are a visualisation of idealised, short manoeuvres. Interstellar duration and
-        crew proper time use the constant-speed equations for the selected velocity; the animation
-        is not a relativistic acceleration trajectory. One simulation drives every camera panel.
+        Burn sequences are a short visualisation of idealised manoeuvres. With Advanced SR each leg
+        uses the accelerate–cruise–brake solution, and both clocks advance through acceleration,
+        cruise and braking with the speed actually reached; Simple SR keeps the constant-speed
+        equations. One simulation drives every camera panel.
       </p>
     </section>
   )
