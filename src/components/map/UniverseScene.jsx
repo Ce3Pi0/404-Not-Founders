@@ -78,9 +78,9 @@ function HostStars({ systems, glow }) {
     systems.forEach((system, index) => {
       positions.set(system.renderPosition, index * 3)
       color.set(starColor(system.planets[0]?.starTeffK))
-      const brightness = system.planets.length > 1 ? 1 : 0.8
+      const brightness = system.planets.length > 1 ? 1 : 0.9
       colors.set([color.r * brightness, color.g * brightness, color.b * brightness], index * 3)
-      sizes[index] = system.planets.length > 1 ? 1.15 : 0.9
+      sizes[index] = system.planets.length > 1 ? 1.2 : 1
     })
     const buffer = new THREE.BufferGeometry()
     buffer.setAttribute('position', new THREE.BufferAttribute(positions, 3))
@@ -109,10 +109,10 @@ function HostStars({ systems, glow }) {
             float depth = max(1.0, -mv.z);
             gl_PointSize = clamp(
               pointSize * pixelRatio * (110.0 / depth),
-              2.2 * pixelRatio,
-              8.5 * pixelRatio
+              3.6 * pixelRatio,
+              12.0 * pixelRatio
             );
-            vFade = clamp(1.35 - depth / 420.0, 0.68, 1.0);
+            vFade = clamp(1.45 - depth / 520.0, 0.82, 1.15);
             gl_Position = projectionMatrix * mv;
           }
         `,
@@ -122,8 +122,13 @@ function HostStars({ systems, glow }) {
           varying float vFade;
           void main() {
             vec4 tex = texture2D(map, gl_PointCoord);
-            if (tex.a < 0.01) discard;
-            gl_FragColor = vec4(vColor, 1.0) * tex * vFade;
+            /* A solid core keeps each star a point you can aim at, with the
+             * soft sprite left over as its glow. */
+            float core = smoothstep(0.3, 0.06, length(gl_PointCoord - vec2(0.5)));
+            float alpha = max(tex.a, core);
+            if (alpha < 0.01) discard;
+            vec3 colour = vColor * vFade + vec3(core) * 0.5;
+            gl_FragColor = vec4(colour, 1.0) * alpha;
           }
         `,
         transparent: true,
