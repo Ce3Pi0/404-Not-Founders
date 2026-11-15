@@ -7,7 +7,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { LABEL_LIMIT, PERSISTENT_LABEL_NAMES, labelSystems } from '../src/lib/mapLabels.js'
+import {
+  LABEL_LIMIT,
+  PERSISTENT_LABEL_NAMES,
+  boxesOverlap,
+  labelExtent,
+  labelSystems,
+  pickVisibleLabels,
+} from '../src/lib/mapLabels.js'
 
 const system = (name, distanceLy = 10) => ({ name, distanceLy, planets: [] })
 
@@ -103,4 +110,28 @@ test('nearby systems fill the remaining slots', () => {
   assert.equal(labels.length, LABEL_LIMIT)
   assert.equal(labels[0].name, 'Solar System')
   assert.equal(labels[1].name, 'GJ 1061')
+})
+
+/* ------------------------------------------------------- collision rules -- */
+
+test('a label that would cover a higher-priority one is dropped', () => {
+  const boxes = [
+    { x: 100, y: 100, width: 70, height: 16 }, // kept: highest priority
+    { x: 120, y: 102, width: 70, height: 16 }, // overlaps the first
+    { x: 100, y: 160, width: 70, height: 16 }, // clear of both
+  ]
+  assert.deepEqual(pickVisibleLabels(boxes), [true, false, true])
+})
+
+test('labels only need to clear each other by the padding margin', () => {
+  const a = { x: 100, y: 100, width: 60, height: 16 }
+  // Half-widths sum to 60; the 4 px margin means the centres must sit at
+  // least 64 px apart before the labels are considered clear.
+  assert.equal(boxesOverlap(a, { x: 164, y: 100, width: 60, height: 16 }, 4), false)
+  assert.equal(boxesOverlap(a, { x: 162, y: 100, width: 60, height: 16 }, 4), true)
+})
+
+test('the home label is measured wider than a plain name of the same length', () => {
+  assert.ok(labelExtent('Solar System', true) > labelExtent('Solar System', false))
+  assert.ok(labelExtent('GJ 1061') >= 54)
 })

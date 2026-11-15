@@ -3,9 +3,9 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
 const AXES = [
-  { color: '#9a0680', vector: [1, 0, 0] },
+  { color: '#5ee7ff', vector: [1, 0, 0] },
   { color: '#ffffff', vector: [0, 1, 0] },
-  { color: '#79018c', vector: [0, 0, 1] },
+  { color: '#a78bfa', vector: [0, 0, 1] },
 ]
 
 /** The three map axes rotate opposite the camera, so up stays up. */
@@ -59,7 +59,7 @@ export default function OrientationGizmo({ quaternionRef }) {
           <Axes quaternionRef={quaternionRef} />
         </Canvas>
       </div>
-      <span className="text-[8px] tracking-[0.16em] text-ink/45 uppercase">Orientation</span>
+      <span className="text-[8px] tracking-[0.16em] text-white/40 uppercase">Orientation</span>
     </div>
   )
 }

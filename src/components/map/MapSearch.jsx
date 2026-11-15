@@ -66,13 +66,13 @@ export default function MapSearch({ originEntry, onPick }) {
         placeholder="Search star systems or worlds"
         aria-label="Search star systems and worlds"
         data-testid="map-search-input"
-        className="field h-9 rounded-xl py-0 text-[12px] backdrop-blur"
+        className="h-9 w-full rounded-xl border border-white/12 bg-[#03060d]/85 px-3 text-[12px] text-white outline-none backdrop-blur transition placeholder:text-white/35 focus:border-[#5ee7ff]/60"
       />
 
       {open && query.trim() !== '' && (
-        <div className="absolute inset-x-0 top-full z-30 mt-1.5 max-h-64 overflow-auto rounded-xl border border-line/60 bg-void/95 p-1 shadow-lg backdrop-blur">
+        <div className="absolute inset-x-0 top-full z-30 mt-1.5 max-h-64 overflow-auto rounded-xl border border-white/12 bg-[#03060d]/96 p-1 shadow-[0_24px_50px_-28px_#000] backdrop-blur-xl">
           {results.length === 0 && (
-            <p className="px-2.5 py-2 text-[11px] text-ink/55">
+            <p className="px-2.5 py-2 text-[11px] text-white/45">
               No host star or world by that name in the drawn region.
             </p>
           )}
@@ -85,20 +85,22 @@ export default function MapSearch({ originEntry, onPick }) {
                 onClick={() => choose(result)}
                 onMouseEnter={() => setActive(index)}
                 className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition ${
-                  index === active ? 'bg-panel/60' : 'hover:bg-panel/35'
+                  index === active ? 'bg-white/[0.08]' : 'hover:bg-white/[0.05]'
                 }`}
               >
                 <span
                   className={`shrink-0 rounded px-1 py-[1px] text-[8px] tracking-[0.12em] uppercase ${
                     result.type === 'system'
-                      ? 'border border-line/60 text-ink/70'
-                      : 'border border-line/40 text-ink/50'
+                      ? 'border border-[#5ee7ff]/40 text-[#bff3ff]/80'
+                      : 'border border-white/15 text-white/45'
                   }`}
                 >
                   {result.type === 'system' ? 'Star' : 'World'}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[12px] text-ink">{result.name}</span>
-                <span className="num shrink-0 text-[10px] text-ink/50">
+                <span className="min-w-0 flex-1 truncate text-[12px] text-white/85">
+                  {result.name}
+                </span>
+                <span className="num shrink-0 text-[10px] text-white/40">
                   {distance == null
                     ? '—'
                     : distance < 0.01

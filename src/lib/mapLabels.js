@@ -64,3 +64,31 @@ export function labelSystems({
 
   return out
 }
+
+/** Rough on-screen width of a star label, in CSS pixels, from its text. */
+export function labelExtent(name, isHome = false) {
+  return Math.max(54, (name?.length ?? 0) * 6.4 + 20 + (isHome ? 34 : 0))
+}
+
+/** Axis-aligned overlap test with a breathing margin between labels. */
+export function boxesOverlap(a, b, pad = 4) {
+  return (
+    Math.abs(a.x - b.x) * 2 < a.width + b.width + pad * 2 &&
+    Math.abs(a.y - b.y) * 2 < a.height + b.height + pad * 2
+  )
+}
+
+/**
+ * Decide which projected labels can be drawn without colliding. Input order is
+ * priority order (mandatory roles first, see `labelSystems`), and a label that
+ * would land on a higher-priority one is dropped rather than stacked into an
+ * unreadable pile. Pure, so the placement rule is unit-tested.
+ */
+export function pickVisibleLabels(boxes, pad = 4) {
+  const kept = []
+  return boxes.map((box) => {
+    if (kept.some((other) => boxesOverlap(box, other, pad))) return false
+    kept.push(box)
+    return true
+  })
+}

@@ -92,22 +92,45 @@ light-year — so no visual compression exists and drawn coordinates equal the p
 are kept separate so any future compression stays explicit, and every distance shown in the panel or
 used for routing is measured from `mapPosition`/`position`, never from what is drawn.
 
-The first version draws only systems within 150 ly. Systems whose archive row has no `sy_dist` are
-left out of the map (their `mapPosition` is `null`) but remain searchable and routable, and systems
-beyond the region are counted in the map overlay. Names are HTML labels projected from the 3D
-positions and capped at 12, because no 3D text library is installed.
+The map draws only systems within 150 ly. Systems whose archive row has no `sy_dist` are left out of
+the map (their `mapPosition` is `null`) but remain searchable and routable, and systems beyond the
+region are counted in the map overlay. Names are HTML labels projected from the 3D positions, capped
+at 12, because no 3D text library is installed; a projected label that would land on a
+higher-priority one is dropped instead of stacked (`pickVisibleLabels` in `lib/mapLabels.js`).
+
+### The scene
+
+- **Solar System.** A small Sun-coloured star marker at the origin with a thin warm outline and the
+  label `Solar System — Home`. Its on-screen size is held constant by the camera (about the size of
+  a catalogue marker), so it never implies an astronomical diameter of light-years. No sphere, no
+  bloom and no Earth orbit are drawn at this scale.
+- **Depth.** Star points take the host star's blackbody colour and shrink with distance from the
+  camera; thin rings at 5/10/25/50/100 ly on the reference plane, faint radial spokes and vertical
+  stems from nearby systems down to that plane give the cloud a measured volume.
+- **Home framing.** `HOME_CAMERA` in `lib/mapCamera.js` is oblique and ~17 ly out, so the nearest
+  catalogue systems separate into real empty space instead of collapsing onto the Sun.
+- **Route.** The planner's route is drawn as a thin cyan path with a ring at each end and its
+  distance in light-years at the midpoint. It is only drawn once asked for (**Frame route** /
+  **Line on**), because a line to a destination 40 ly away would otherwise leave the opening view
+  before anything was chosen. **Frame route** fits both systems with `framingForRoute`.
 
 ### Selecting and navigating
 
-- Hovering a point raises its glow and shows the system's name; clicking it opens a floating card
-  with the host star, its distance from the current location, its known exoplanets, **Explore
-  System** and **Plan Travel**. Clicking blank space clears the selection.
+- Hovering a point raises its glow and shows the system's name; clicking it selects the system,
+  eases the camera gently toward it and opens a collapsible drawer with the host star, its distance
+  from the current location, its known exoplanets, **Explore System** and **Plan Travel**. Clicking
+  blank space clears the selection. The navigation rail on the left stays compact (search, current
+  location, destination with distance, system count) so the map keeps most of the viewport.
+- **Double-clicking** a star dives into it: the Solar System hands over to the Earth orbit scene, an
+  exoplanet host opens its local system explorer (`/system/:id`, AU scale). The same dive also runs
+  when a pointer leaves the map through the solar marker while zooming in.
 - The search field matches host stars and individual planets straight from the archive extract,
   limited to the drawn region so every hit has a real position to fly to.
 - Selecting a result eases the camera to that system's exact 3D point. **Explore System** glides in
   and opens `/system/:id`; **← Back to Universe** returns with the same star selected and the camera
   framing restored (`SystemView`, `src/lib/router.js`). The selected star carries a cyan halo and a
-  dashed distance line to the current location.
+  dashed distance line to the current location. **Center on location** re-frames wherever the crew
+  actually is and **Reset view** glides home, neither of which touches the route.
 - Camera flights interpolate both position and target with an ease-in-out curve, and any manual
   input (drag, wheel, touch) cancels a flight immediately. Zooming the camera never changes the
   mission's current location.
