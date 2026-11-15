@@ -1,10 +1,13 @@
-// Tiny history-based routing for the map's `/system/:id` deep links.
+// Tiny history-based routing for the map's `/system/:id` deep links and the
+// star-system explorer's `/planet/:id` and `/travel` links.
 //
-// The app's screens are driven by a step state machine, so only the system
-// detail page needs a real URL. One helper keeps it in sync with the browser
-// without pulling in a router dependency.
+// The app's screens are driven by a step state machine, so only the deep links
+// need a real URL. These helpers keep them in sync with the browser without
+// pulling in a router dependency.
 
 import { useEffect, useState } from 'react'
+
+export const TRAVEL_PATH = '/travel'
 
 export function navigate(path, { replace = false } = {}) {
   if (window.location.pathname === path) return
@@ -15,6 +18,15 @@ export function navigate(path, { replace = false } = {}) {
 export function systemIdFromPath(pathname) {
   const match = /^\/system\/([^/]+)\/?$/.exec(pathname ?? '')
   return match ? decodeURIComponent(match[1]) : null
+}
+
+export function planetIdFromPath(pathname) {
+  const match = /^\/planet\/([^/]+)\/?$/.exec(pathname ?? '')
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+export function isTravelPath(pathname) {
+  return pathname === TRAVEL_PATH
 }
 
 /** Current pathname, re-read on browser navigation. */

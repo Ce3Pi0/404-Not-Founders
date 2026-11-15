@@ -1,37 +1,72 @@
-import { useMemo, useState } from 'react'
-import { classifyPlanet } from '../../lib/planet'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import * as THREE from 'three'
+import PlanetaryScene from './PlanetaryScene'
+import SystemWorldPanel from './SystemWorldPanel'
+import OrientationGizmo from './OrientationGizmo'
 import { formatNumber } from '../../lib/physics'
 import { entryIsSolar, mapDistanceLy, mapSystemFor } from '../../lib/starMap'
-
-function Stat({ label, value }) {
-  return (
-    <div className="rounded-lg border border-line/40 bg-void/45 px-2.5 py-2">
-      <div className="text-[8px] tracking-[0.16em] text-ink/45 uppercase">{label}</div>
-      <div className="num mt-0.5 text-[12px] text-ink/90">{value}</div>
-    </div>
-  )
-}
+import { buildPlanetSystem, daysPerSecond, formatSimSpeed, systemFraming } from '../../lib/planetSystem'
 
 /**
- * `/system/:id` — the destination of "Explore System". Shows the host star,
- * its distance from the current location and every known exoplanet. Back to
- * Universe returns to the map with its selection and framing intact.
+ * `/system/:id` — the Star System Explorer.
+ *
+ * Zooming into a host star swaps the interstellar, light-year universe map for
+ * this local scene, which works in AU: every placed planet sits on the archive's
+ * `pl_orbsmax`, orbit rates come from `pl_orbper`, and the camera is framed to
+ * the system. Selection flies the camera to a world and feeds the inspector.
  */
-export default function SystemView({ entry, origin, initialPlanetId, onBack, onSetDestination }) {
+export default function SystemView({
+  entry,
+  origin,
+  initialPlanetId,
+  onBack,
+  onViewPlanet,
+  onPlanTravel,
+}) {
+  const system = useMemo(() => buildPlanetSystem(entry), [entry])
+  const framing = useMemo(() => systemFraming(system), [system])
   const originEntry = useMemo(() => mapSystemFor(origin), [origin])
+
   const [selectedId, setSelectedId] = useState(initialPlanetId ?? null)
+  const [orbitsOn, setOrbitsOn] = useState(true)
+  const [labelsOn, setLabelsOn] = useState(true)
+  const [speedPosition, setSpeedPosition] = useState(0.55)
+  const [paused, setPaused] = useState(false)
+  const [resetSignal, setResetSignal] = useState(0)
+  const [focus, setFocus] = useState(null)
 
-  const selectedPlanet = useMemo(() => {
-    if (!entry) return null
-    return (
-      entry.planets.find((planet) => planet.id === selectedId) ??
-      entry.planets.find((planet) => planet.id === origin?.id) ??
-      entry.planets[0] ??
-      null
-    )
-  }, [entry, selectedId, origin])
+  const labelsRef = useRef(null)
+  const scaleBarRef = useRef(null)
+  const scaleTextRef = useRef(null)
+  const cameraQuaternionRef = useRef(new THREE.Quaternion())
+  const focusNonce = useRef(0)
 
-  if (!entry) {
+  /** A different system starts fresh: same camera framing, new selection. */
+  useEffect(() => {
+    setSelectedId(initialPlanetId ?? null)
+    setFocus(null)
+    setResetSignal(0)
+  }, [entry?.name, initialPlanetId])
+
+  const selectPlanet = useCallback(
+    (planet) => {
+      if (!planet) {
+        setSelectedId(null)
+        return
+      }
+      setSelectedId(planet.id)
+      const placed = system?.bodies.some((body) => body.planet.id === planet.id)
+      if (placed) {
+        focusNonce.current += 1
+        setFocus({ id: planet.id, nonce: focusNonce.current })
+      }
+    },
+    [system],
+  )
+
+  const timeScale = daysPerSecond(speedPosition)
+
+  if (!entry || !system) {
     return (
       <section className="screen panel flex flex-col items-start gap-3 p-6">
         <div className="text-[9px] tracking-[0.18em] text-ink/45 uppercase">System</div>
@@ -47,146 +82,199 @@ export default function SystemView({ entry, origin, initialPlanetId, onBack, onS
   }
 
   const solar = entryIsSolar(entry)
-  const distance = mapDistanceLy(entry, originEntry)
-  const look = selectedPlanet ? classifyPlanet(selectedPlanet) : null
+  const fromHere = mapDistanceLy(entry, originEntry)
+  const selectedPlanet =
+    entry.planets.find((planet) => planet.id === selectedId) ?? null
+  const selectedBody =
+    system.bodies.find((body) => body.planet.id === selectedId) ?? null
 
   return (
-    <section className="screen grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)]">
-      <div className="panel p-5">
-        <button
-          type="button"
-          className="btn px-3 py-1.5 text-[11px]"
-          onClick={onBack}
-          data-testid="back-to-universe"
-        >
-          ← Back to Universe
-        </button>
-
-        <div className="mt-4 text-[9px] tracking-[0.18em] text-ink/45 uppercase">
-          {solar ? 'Home system' : 'Host-star system'}
-        </div>
-        <h1 className="mt-1 text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-          {entry.name}
-        </h1>
-        <p className="mt-1 text-[11px] text-ink/65">
-          {formatNumber(entry.planets.length, 0)} known exoplanet
-          {entry.planets.length === 1 ? '' : 's'} · NASA Exoplanet Archive
-        </p>
-
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Stat
-            label={`From ${originEntry?.name ?? 'current location'}`}
-            value={distance == null ? '—' : `${formatNumber(distance, 2)} ly`}
-          />
-          <Stat label="Known worlds" value={`${entry.planets.length}`} />
-          <Stat
-            label="From Earth"
-            value={solar ? 'origin' : `${formatNumber(entry.distanceLy, 2)} ly`}
-          />
-          <Stat
-            label="RA / Dec"
-            value={`${formatNumber(entry.ra, 1)}° / ${formatNumber(entry.dec, 1)}°`}
-          />
-          <Stat
-            label="Map x, y, z"
-            value={
-              entry.mapPosition
-                ? entry.mapPosition.map((value) => formatNumber(value, 1)).join(', ')
-                : 'not plotted'
-            }
-          />
-          <Stat label="Current location" value={origin?.name ?? 'Earth'} />
-        </div>
-
-        <div className="mt-5">
-          <div className="mb-1.5 flex items-baseline justify-between">
-            <span className="text-[9px] tracking-[0.16em] text-ink/45 uppercase">Exoplanets</span>
-            <span className="text-[9px] text-ink/40">select one to inspect</span>
+    <section className="screen space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <button
+            type="button"
+            className="btn px-3 py-1.5 text-[11px]"
+            onClick={onBack}
+            data-testid="back-to-universe"
+          >
+            ← Back to Universe
+          </button>
+          <div className="mt-3 text-[9px] tracking-[0.18em] text-ink/45 uppercase">
+            {solar ? 'Home system' : 'Host-star system'} · Star System Explorer
           </div>
-          <ul className="flex flex-wrap gap-1.5">
-            {entry.planets.map((planet) => {
-              const active = selectedPlanet && planet.id === selectedPlanet.id
-              return (
-                <li key={planet.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId(planet.id)}
-                    aria-pressed={active}
-                    className={`chip ${active ? 'border-cyan-300/70 bg-panel/60 text-white' : ''}`}
-                  >
-                    {planet.name}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+          <h1 className="mt-1 text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
+            {entry.name}
+          </h1>
+          <p className="mt-1 text-[11px] text-ink/65">
+            {formatNumber(entry.planets.length, 0)} known world
+            {entry.planets.length === 1 ? '' : 's'} · {system.placedCount} on the rings · local
+            scale in AU
+            {fromHere != null && fromHere > 0 && (
+              <span className="text-ink/45"> · {formatNumber(fromHere, 2)} ly from {origin?.name}</span>
+            )}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={`btn px-3 py-1.5 text-[11px] ${orbitsOn ? 'border-cyan-300/60' : 'text-ink/60'}`}
+            aria-pressed={orbitsOn}
+            onClick={() => setOrbitsOn((value) => !value)}
+          >
+            Orbits
+          </button>
+          <button
+            type="button"
+            className={`btn px-3 py-1.5 text-[11px] ${labelsOn ? 'border-cyan-300/60' : 'text-ink/60'}`}
+            aria-pressed={labelsOn}
+            onClick={() => setLabelsOn((value) => !value)}
+          >
+            Labels
+          </button>
+          <button
+            type="button"
+            className="btn px-3 py-1.5 text-[11px]"
+            onClick={() => setResetSignal((value) => value + 1)}
+          >
+            Reset camera
+          </button>
         </div>
       </div>
 
-      {selectedPlanet && (
-        <aside className="panel p-5" data-testid="system-world">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[9px] tracking-[0.18em] text-ink/45 uppercase">
-                {selectedPlanet.kind === 'earth' ? 'Home world' : 'Exoplanet'}
-              </div>
-              <h2 className="mt-1 truncate text-lg leading-tight font-semibold">
-                {selectedPlanet.name}
-              </h2>
-              <div className="mt-1 text-[11px] text-ink/60">{entry.name}</div>
-            </div>
-            <span
-              className="rounded-full border border-line/60 px-2 py-0.5 text-[10px] text-ink/70"
-              style={{ background: look?.palette?.[3] }}
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_352px]">
+        <div className="panel overflow-hidden">
+          <div className="relative h-[56vh] min-h-[420px] w-full">
+            <PlanetaryScene
+              system={system}
+              framing={framing}
+              selectedId={selectedId}
+              focus={focus}
+              orbitsOn={orbitsOn}
+              labelsOn={labelsOn}
+              timeScale={timeScale}
+              paused={paused}
+              labelsRef={labelsRef}
+              scaleBarRef={scaleBarRef}
+              scaleTextRef={scaleTextRef}
+              cameraQuaternionRef={cameraQuaternionRef}
+              resetSignal={resetSignal}
+              onSelect={selectPlanet}
+            />
+
+            {/* projected planet names, following the live orbital positions */}
+            <div
+              ref={labelsRef}
+              aria-label="Planet name labels"
+              className="pointer-events-none absolute inset-0 z-10 overflow-hidden"
+              style={{ display: labelsOn ? undefined : 'none' }}
             >
-              {look?.label}
-            </span>
-          </div>
+              {system.bodies.map((body) => {
+                const active = body.planet.id === selectedId
+                return (
+                  <div
+                    key={body.planet.id}
+                    className="absolute top-0 left-0 will-change-transform"
+                    style={{ visibility: 'hidden' }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => selectPlanet(body.planet)}
+                      className={`pointer-events-auto -translate-x-1/2 -translate-y-[150%] rounded border px-1.5 py-[1px] text-[10px] whitespace-nowrap backdrop-blur-sm transition ${
+                        active
+                          ? 'border-cyan-300/80 bg-void/85 text-cyan-100'
+                          : 'border-line/35 bg-void/65 text-ink/75 hover:border-line hover:text-white'
+                      }`}
+                    >
+                      {body.planet.name}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <Stat
-              label="Orbit"
-              value={
-                selectedPlanet.semiMajorAxisAu == null
-                  ? 'unknown'
-                  : `${formatNumber(selectedPlanet.semiMajorAxisAu, 3)} AU`
-              }
-            />
-            <Stat
-              label="Period"
-              value={
-                selectedPlanet.orbitalPeriodDays == null
-                  ? 'unknown'
-                  : `${formatNumber(selectedPlanet.orbitalPeriodDays, 1)} d`
-              }
-            />
-            <Stat
-              label="Equilibrium"
-              value={
-                selectedPlanet.eqTempK == null
-                  ? 'unknown'
-                  : `${formatNumber(selectedPlanet.eqTempK, 0)} K`
-              }
-            />
-            <Stat
-              label="Radius"
-              value={`${formatNumber(selectedPlanet.radiusEarth, 2)} R⊕`}
-            />
-          </div>
+            {/* local scale — the system scene measures AU, never light-years */}
+            <div className="pointer-events-none absolute top-3 left-3 z-20 rounded-xl border border-line/45 bg-void/85 px-3 py-2 backdrop-blur">
+              <div className="flex items-center gap-2">
+                <div ref={scaleBarRef} className="h-px bg-white/70" style={{ width: 120 }} />
+                <span
+                  ref={scaleTextRef}
+                  data-testid="system-scale-readout"
+                  className="num text-[10px] text-ink/85"
+                >
+                  —
+                </span>
+              </div>
+              <div className="mt-1 text-[8px] tracking-[0.16em] text-ink/45 uppercase">
+                AU · linear · 1 unit = 1 AU
+              </div>
+            </div>
 
-          <button
-            type="button"
-            className="btn btn-primary mt-4 w-full py-2 text-[12px]"
-            onClick={() => onSetDestination(selectedPlanet)}
-          >
-            Plan Travel
-          </button>
-          <p className="mt-2 text-[10px] leading-relaxed text-ink/40">
-            Bulk properties are estimated from the archive's orbital columns; positions use the
-            exact RA/Dec/distance frame.
-          </p>
-        </aside>
-      )}
+            {/* simulation time */}
+            <div className="pointer-events-auto absolute bottom-3 left-3 z-20 w-[250px] rounded-xl border border-line/45 bg-void/85 px-3 py-2 backdrop-blur">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[8px] tracking-[0.16em] text-ink/45 uppercase">
+                  Simulation time
+                </span>
+                <span className="num text-[10px] text-ink/85">1 s ≈ {formatSimSpeed(timeScale)}</span>
+              </div>
+              <div className="mt-1.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="btn px-2 py-1 text-[10px]"
+                  onClick={() => setPaused((value) => !value)}
+                  aria-pressed={paused}
+                >
+                  {paused ? 'Play' : 'Pause'}
+                </button>
+                <div className="relative h-[18px] flex-1">
+                  <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-line/60" />
+                  <div
+                    className="absolute top-1/2 left-0 h-1.5 -translate-y-1/2 rounded-full bg-ion"
+                    style={{ width: `${speedPosition * 100}%` }}
+                  />
+                  <input
+                    type="range"
+                    className="slider relative"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={speedPosition}
+                    aria-label="Simulation time rate"
+                    onChange={(event) => setSpeedPosition(Number(event.target.value))}
+                  />
+                </div>
+              </div>
+              <div className="mt-1 text-[8px] text-ink/40">
+                orbit rates from pl_orbper · starting phases illustrative
+              </div>
+            </div>
+
+            {/* 3D orientation indicator */}
+            <div className="pointer-events-none absolute right-3 bottom-3 z-20 rounded-xl border border-line/45 bg-void/80 p-1.5 backdrop-blur">
+              <OrientationGizmo quaternionRef={cameraQuaternionRef} />
+            </div>
+
+            <div className="pointer-events-none absolute right-3 top-3 z-20 hidden rounded-full border border-line/40 bg-void/75 px-3 py-1 text-[9px] text-ink/55 backdrop-blur lg:block">
+              Drag to orbit · scroll to zoom · click a planet
+            </div>
+          </div>
+        </div>
+
+        <SystemWorldPanel
+          entry={entry}
+          system={system}
+          selectedPlanet={selectedPlanet}
+          selectedBody={selectedBody}
+          fromHere={fromHere}
+          originName={origin?.name}
+          isCurrentWorld={Boolean(selectedPlanet && origin && selectedPlanet.id === origin.id)}
+          onSelect={selectPlanet}
+          onViewPlanet={onViewPlanet}
+          onPlanTravel={onPlanTravel}
+        />
+      </div>
     </section>
   )
 }

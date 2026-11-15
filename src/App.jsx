@@ -9,18 +9,28 @@ import AboutDialog from './components/AboutDialog'
 import RelativityLab from './components/lab/RelativityLab'
 import StarMapView from './components/map/StarMapView'
 import SystemView from './components/map/SystemView'
-import { navigate, systemIdFromPath, usePathname } from './lib/router'
+import PlanetDetailView from './components/PlanetDetailView'
+import {
+  TRAVEL_PATH,
+  isTravelPath,
+  navigate,
+  planetIdFromPath,
+  systemIdFromPath,
+  usePathname,
+} from './lib/router'
 import { systemById, systemId } from './lib/starMap'
 import { simulateMission } from './lib/physics'
 import { emptySimulation, loadSimulation, recordMission, saveSimulation } from './lib/simulation'
-import { DEFAULT_PLANET, EARTH, distanceLyBetween, nearbyPlanets } from './lib/catalog'
-
+import { DEFAULT_PLANET, EARTH, distanceLyBetween, nearbyPlanets, planetById } from './lib/catalog'
 
 export default function App() {
   const pathname = usePathname()
-  const [step, setStep] = useState(() => (systemIdFromPath(window.location.pathname) ? 'map' : 'destination'))
+  const [stepState, setStepState] = useState('destination')
   const [location, setLocation] = useState(EARTH)
-  const [planet, setPlanet] = useState(DEFAULT_PLANET)
+  const [planet, setPlanet] = useState(() => {
+    const id = planetIdFromPath(window.location.pathname)
+    return id ? planetById(id) : DEFAULT_PLANET
+  })
   const [beta, setBeta] = useState(0.9)
   const [shipName, setShipName] = useState('Odyssey')
   const [prediction, setPrediction] = useState({ earth: '', ship: '' })
@@ -34,21 +44,41 @@ export default function App() {
     camera: { position: null, target: null },
   })
 
+  // The deep links own their screens: /system/:id, /planet/:id and /travel
+  // render even on a cold load or a browser reload, with the step machine for
+  // everything else.
+  const pathSystem = systemById(systemIdFromPath(pathname))
+  const pathPlanetId = planetIdFromPath(pathname)
+  const step = pathSystem
+    ? 'map'
+    : pathPlanetId
+      ? 'planet'
+      : isTravelPath(pathname)
+        ? 'flight'
+        : stepState
+
   const distanceLy = distanceLyBetween(location, planet)
-  const routeSystem = systemById(systemIdFromPath(pathname))
 
   useEffect(() => {
     saveSimulation(sim)
   }, [sim])
 
-  // Leaving the map drops its system URL so reopening starts at the universe.
+  /** A planet deep link selects that world, so its page and travel share it. */
   useEffect(() => {
-    if (step !== 'map' && systemIdFromPath(pathname)) navigate('/')
-  }, [step, pathname])
+    if (!pathPlanetId) return
+    const found = planetById(pathPlanetId)
+    if (found && found.id !== planet.id) setPlanet(found)
+  }, [pathPlanetId, planet.id])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [step])
+
+  /** Every step transition leaves a deep link, so the URL never lies. */
+  const goTo = (next) => {
+    navigate('/')
+    setStepState(next)
+  }
 
   const launch = () => {
     const result = simulateMission(distanceLy, beta)
@@ -62,14 +92,14 @@ export default function App() {
       distanceLy,
       startedAt: Date.now(),
     })
-    setStep('journey')
+    goTo('journey')
   }
 
   const arrive = () => {
     if (!mission) return
     setSim((current) => recordMission(current, mission))
     setLocation(planet)
-    setStep('debrief')
+    goTo('debrief')
   }
 
   const nextMission = () => {
@@ -80,7 +110,7 @@ export default function App() {
       const replacement = nearbyPlanets(here, 8).find((entry) => entry.id !== here.id)
       if (replacement) setPlanet(replacement)
     }
-    setStep('destination')
+    goTo('destination')
   }
 
   const goHome = () => {
@@ -91,15 +121,14 @@ export default function App() {
       const replacement = nearbyPlanets(EARTH, 8).find((entry) => entry.id !== EARTH.id)
       if (replacement) setPlanet(replacement)
     }
-    setStep('destination')
+    goTo('destination')
   }
 
   // The 3D map edits the same origin/destination state as the picker.
   const mapSetDestination = (next) => {
     if (!next || next.id === location.id) return
     setPlanet(next)
-    navigate('/')
-    setStep('destination')
+    goTo('destination')
   }
 
   const mapSetOrigin = (next) => {
@@ -109,24 +138,45 @@ export default function App() {
       const replacement = nearbyPlanets(next, 6).find((entry) => entry.id !== next.id)
       if (replacement) setPlanet(replacement)
     }
-    navigate('/')
-    setStep('destination')
+    goTo('destination')
   }
 
   const openMap = () => {
     if (step === 'map') {
-      navigate('/')
-      setStep('destination')
+      goTo('destination')
       return
     }
     navigate('/')
-    setStep('map')
+    setStepState('map')
   }
 
   const exploreSystem = (entry) => {
     if (!entry) return
-    setStep('map')
+    setStepState('map')
     navigate(`/system/${systemId(entry)}`)
+  }
+
+  // Star System Explorer deep links.
+  const viewPlanet = (next) => {
+    if (!next) return
+    setPlanet(next)
+    mapViewState.current.planetId = next.id
+    navigate(`/planet/${next.id}`)
+    setStepState('planet')
+  }
+
+  const planTravel = (next) => {
+    if (!next) return
+    setPlanet(next)
+    navigate(TRAVEL_PATH)
+    setStepState('flight')
+  }
+
+  const backToSystem = (next) => {
+    if (!next) return
+    mapViewState.current.planetId = next.id
+    navigate(`/system/${systemId({ name: next.star })}`)
+    setStepState('map')
   }
 
   const reset = () => {
@@ -138,7 +188,7 @@ export default function App() {
     setPlanet(DEFAULT_PLANET)
     setMission(null)
     setPrediction({ earth: '', ship: '' })
-    setStep('destination')
+    goTo('destination')
   }
 
   return (
@@ -151,7 +201,7 @@ export default function App() {
         onAbout={() => setAboutOpen(true)}
         onReset={reset}
         inLab={step === 'lab'}
-        onOpenLab={() => setStep(step === 'lab' ? 'destination' : 'lab')}
+        onOpenLab={() => goTo(step === 'lab' ? 'destination' : 'lab')}
         inMap={step === 'map'}
         onOpenMap={openMap}
       />
@@ -173,21 +223,25 @@ export default function App() {
               distanceLy={distanceLy}
               onOriginChange={setLocation}
               onSelect={setPlanet}
-              onContinue={() => setStep('flight')}
+              onContinue={() => goTo('flight')}
               onGoHome={goHome}
-              onOpenMap={() => setStep('map')}
+              onOpenMap={() => {
+                navigate('/')
+                setStepState('map')
+              }}
             />
           </div>
         )}
 
         {step === 'map' &&
-          (routeSystem ? (
+          (pathSystem ? (
             <SystemView
-              entry={routeSystem}
+              entry={pathSystem}
               origin={location}
               initialPlanetId={mapViewState.current.planetId}
-              onBack={() => navigate('/')}
-              onSetDestination={mapSetDestination}
+              onBack={() => goTo('destination')}
+              onViewPlanet={viewPlanet}
+              onPlanTravel={planTravel}
             />
           ) : (
             <StarMapView
@@ -197,12 +251,20 @@ export default function App() {
               onSetDestination={mapSetDestination}
               onSetOrigin={mapSetOrigin}
               onExplore={exploreSystem}
-              onExit={() => {
-                navigate('/')
-                setStep('destination')
-              }}
+              onExit={() => goTo('destination')}
             />
           ))}
+
+        {step === 'planet' && (
+          <PlanetDetailView
+            planet={planet}
+            origin={location}
+            distanceLy={distanceLy}
+            onBack={() => goTo('destination')}
+            onBackToSystem={() => backToSystem(planet)}
+            onPlanTravel={planTravel}
+          />
+        )}
 
         {step === 'flight' && (
           <FlightPlan
@@ -216,7 +278,7 @@ export default function App() {
             prediction={prediction}
             onPredictionChange={setPrediction}
             onLaunch={launch}
-            onBack={() => setStep('destination')}
+            onBack={() => goTo('destination')}
           />
         )}
 
@@ -232,7 +294,7 @@ export default function App() {
         )}
 
         {step === 'lab' && (
-          <RelativityLab shipName={shipName} onExit={() => setStep('destination')} />
+          <RelativityLab shipName={shipName} onExit={() => goTo('destination')} />
         )}
 
         {step === 'debrief' && mission && (

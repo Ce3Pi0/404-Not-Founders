@@ -32,6 +32,10 @@ Built by **404 Not Founders** for **Hack The Nest** — second playable draft.
   names for the selected and nearby systems, a live light-year scale bar, an orientation axis
   indicator and a reset-camera control. Selecting a star opens its worlds and routes straight into
   the existing departure/destination flow (`Star map` in the header, or from the route stage).
+- **Star System Explorer** — zooming into a host star leaves the light-year map for a separate
+  planetary scene in AU: every known world on its archive semi-major axis, orbit rates from the
+  archive period, click-to-select with a camera flight, orbit and label toggles, and an adjustable
+  simulation clock. Systems are generated from the archive rows, never hardcoded.
 - **Relativity Lab** — a flight console with four camera perspectives (first-, second- and
   third-person, plus a bird's-eye system map), a synchronized Point A / Point B split screen, live
   digital clocks, spacecraft and G-force telemetry, and full start / pause / resume / reset control
@@ -95,6 +99,38 @@ positions and capped at 12, because no 3D text library is installed.
 - Camera flights interpolate both position and target with an ease-in-out curve, and any manual
   input (drag, wheel, touch) cancels a flight immediately. Zooming the camera never changes the
   mission's current location.
+
+## Star System Explorer
+
+`/system/:id` (`SystemView`, `PlanetaryScene`, `SystemWorldPanel`) is a separate scene with its own
+scale. The universe map stays in light-years; the local system works in **AU** —
+`src/lib/planetSystem.js` defines one scene unit as one AU, so `pl_orbsmax` is drawn literally as the
+orbital radius and the camera is framed to the system instead of sharing a galactic scale. No
+conversion is applied between the two scenes.
+
+Built from the archive rows for that host star:
+
+- The host star sits at the centre, coloured by the derived effective temperature, with an
+  exaggerated drawn radius (a real star is ~0.005 AU wide) that still follows the derived stellar
+  radius, so a giant reads larger than a red dwarf.
+- Every planet with `pl_orbsmax` is placed at that semi-major axis in a circular orbit, and its
+  angular rate is `2π / pl_orbper` per simulated day. The simulation clock is a log slider
+  (0.05–20 simulated days per real second) with pause. A world with an orbit but no reported period
+  is drawn and labelled as not animated.
+- Relative sizes follow the radius estimate (`radiusEarth`) through a square root, exaggerated for
+  visibility; the extract has no `pl_rade`, so the inspector marks these as estimates and the
+  surface texture as an artistic interpretation — never imagery.
+- Orbits use deterministic **illustrative** starting phases from the planet name. The extract has no
+  epoch or mean anomaly, so the app never claims a present-day planetary position.
+- A planet whose row has no `pl_orbsmax` is never given an invented radius: it is listed in the
+  inspector with an explicit **"Orbit not fully characterized"** state and stays off the rings.
+
+Interactions: drag or scroll to orbit and zoom the star; click a planet, its projected label, or a
+name in the inspector to select it and glide the camera toward it; toggle **Orbits** and **Labels**;
+adjust simulation time; **Reset camera**; **View Planet** (`/planet/:id`); **Plan Travel**
+(`/travel`); and **← Back to Universe**. The live scale bar reads in AU and an orientation gizmo
+tracks the camera. `/planet/:id` is a data record page with a portrait of the world, and both routes
+are real URLs, so they survive a reload (`src/lib/router.js`).
 
 ## Theme
 
@@ -169,9 +205,13 @@ src/
   lib/launchPhysics.js    launch integrator: thrust, fuel, phases, proper time, telemetry
   lib/labCatalog.js       lab stations (Earth + archive worlds) and route distances
   lib/starMap.js          map-frame entries, 150 ly region, search, labels, exact map distances
-  lib/router.js           pathname routing for /system/:id
+  lib/planetSystem.js     local AU-scale system model: orbits, phases, sizes, camera framing
+  lib/router.js           pathname routing for /system/:id, /planet/:id and /travel
+  lib/glowTexture.js      shared star glow and halo sprites
+  lib/webgl.js            one-time WebGL availability probe
   components/             scene, crew figures, HUD, picker, flight plan, journey, debrief
-  components/map/         3D universe map: scene, labels, search, system card and page, gizmo
+  components/map/         3D universe map and the AU-scale Star System Explorer scene
+  components/PlanetDetailView.jsx  /planet/:id record page and its portrait
   components/lab/         launch console: scene + camera rigs, controls, config, telemetry, education
 ```
 

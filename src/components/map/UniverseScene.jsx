@@ -4,6 +4,8 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { mulberry32 } from '../../lib/planet'
 import { SOLAR_SYSTEM } from '../../lib/starMap'
+import { HAS_WEBGL } from '../../lib/webgl'
+import { createGlowTexture, createHaloTexture } from '../../lib/glowTexture'
 
 const HOME_CAMERA = [18, 12, 26]
 const HOME_TARGET = [0, 0, 0]
@@ -37,50 +39,7 @@ function flightPlan(position, camera, controls, duration = 1.25) {
   }
 }
 
-/** A blank panel is worse than a message: check once whether a 3D view is possible. */
-const HAS_WEBGL = (() => {
-  try {
-    const probe = document.createElement('canvas')
-    const context = probe.getContext('webgl2') ?? probe.getContext('webgl')
-    if (!context) return false
-    // Release the probe context so it never counts against the browser's limit.
-    context.getExtension('WEBGL_lose_context')?.loseContext()
-    return true
-  } catch {
-    return false
-  }
-})()
-
 /* --------------------------------------------------------------- textures -- */
-
-/** Soft radial sprite so every host star reads as a glowing point. */
-function useGlowTexture() {
-  return useMemo(() => {
-    const size = 64
-    const canvas = document.createElement('canvas')
-    canvas.width = size
-    canvas.height = size
-    const context = canvas.getContext('2d')
-    const gradient = context.createRadialGradient(
-      size / 2,
-      size / 2,
-      0,
-      size / 2,
-      size / 2,
-      size / 2,
-    )
-    gradient.addColorStop(0, 'rgba(255,255,255,1)')
-    gradient.addColorStop(0.22, 'rgba(255,255,255,0.85)')
-    gradient.addColorStop(0.55, 'rgba(255,255,255,0.18)')
-    gradient.addColorStop(1, 'rgba(255,255,255,0)')
-    context.fillStyle = gradient
-    context.fillRect(0, 0, size, size)
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.colorSpace = THREE.SRGBColorSpace
-    texture.needsUpdate = true
-    return texture
-  }, [])
-}
 
 /* ---------------------------------------------------------------- geometry -- */
 
@@ -251,37 +210,6 @@ function RouteLine({ from, to }) {
   return <primitive object={line} />
 }
 
-/** Soft cyan bloom plus a crisp ring, drawn from one billboarded texture. */
-function useHaloTexture() {
-  return useMemo(() => {
-    const size = 256
-    const canvas = document.createElement('canvas')
-    canvas.width = size
-    canvas.height = size
-    const context = canvas.getContext('2d')
-    const centre = size / 2
-
-    const bloom = context.createRadialGradient(centre, centre, 0, centre, centre, centre)
-    bloom.addColorStop(0, 'rgba(235,253,255,0.9)')
-    bloom.addColorStop(0.16, 'rgba(150,238,255,0.5)')
-    bloom.addColorStop(0.42, 'rgba(94,231,255,0.16)')
-    bloom.addColorStop(1, 'rgba(94,231,255,0)')
-    context.fillStyle = bloom
-    context.fillRect(0, 0, size, size)
-
-    context.strokeStyle = 'rgba(174,245,255,0.95)'
-    context.lineWidth = 5
-    context.beginPath()
-    context.arc(centre, centre, size * 0.38, 0, Math.PI * 2)
-    context.stroke()
-
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.colorSpace = THREE.SRGBColorSpace
-    texture.needsUpdate = true
-    return texture
-  }, [])
-}
-
 /**
  * Pulsing cyan halo around the inspected star. Its size follows the camera
  * distance so the halo keeps an elegant, constant on-screen size at any zoom.
@@ -395,7 +323,7 @@ function SceneRig({
   const hoverAt = useRef(0)
   const tween = useRef(null)
   const firstReset = useRef(true)
-  const haloTexture = useHaloTexture()
+  const haloTexture = useMemo(createHaloTexture, [])
 
   useEffect(() => {
     controls.enableDamping = true
@@ -648,7 +576,7 @@ export default function UniverseScene({
   onSelect,
   onHover,
 }) {
-  const glow = useGlowTexture()
+  const glow = useMemo(createGlowTexture, [])
 
   if (!HAS_WEBGL) {
     return (
