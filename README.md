@@ -21,6 +21,10 @@ Built by **404 Not Founders** for **Hack The Nest** — first playable draft.
   prediction accuracy, the destination's surface-gravity clock rate, and a persistent mission log.
 - **Age** — the crew, the Earth twin and the locals age through baby → toddler → child → teen →
   adult → elderly → skeleton as accumulated time crosses each threshold.
+- **Relativity Lab** — a flight console with four camera perspectives (first-, second- and
+  third-person, plus a bird's-eye system map), a synchronized Point A / Point B split screen, live
+  digital clocks, spacecraft and G-force telemetry, and full start / pause / resume / reset control
+  over a segmented acceleration–cruise–deceleration flight.
 
 ## Run it
 
@@ -61,6 +65,41 @@ Simplifications for this draft: one-way trips at constant velocity (no accelerat
 no orbital motion, no gravitational lensing. Speeds and mission profiles are hypothetical; the
 destinations are real.
 
+## Relativity Lab model
+
+The lab is an interactive launch simulation. You configure a craft, launch it from a
+planet, and keep changing the mission while it flies.
+
+- **The integrator.** State is advanced step by step in the shared rest frame of the two
+  stations. While the ship thrusts, velocity is integrated in rapidity space, which is exact
+  for a constant proper acceleration over a step:
+  `η₁ = asinh(sinh η₀ + a·dt/c)`, `β = tanh η`, `Δτ = (c/a)(η₁ − η₀)`.
+  Nothing is prerecorded: thrust, mass, fuel, target speed, course and the arrival burn all
+  change the trajectory the next frame.
+- **Ascent.** Newtonian climb at the chosen launch angle through a 100 km atmosphere:
+  `dv/dt = a_thrust − g(r)·sin θ`, with `g(r) = g₀(R/r)²` from the planet's mass and radius.
+  Below the surface gravity the craft is held on the pad with an explanation instead of
+  silently failing.
+- **Fuel.** A photon drive (`Isp = c/g₀`), so the burn rate is `thrust/c`; the propellant
+  load caps the total burn time. Running dry shuts the engines down and the ship coasts.
+- **Clocks.** The ship's proper time is integrated along the path actually flown:
+  `dτ = dt · √(1 − v²/c²) · √(1 − rₛ/r)`, with the gravitational factor taken from the launch
+  planet's potential while the ship climbs out of it and 1 in deep space. The launch planet
+  and destination clocks advance at their own surface rates. G-force is proper acceleration
+  ÷ 9.80665 m/s² and never enters the time-dilation integral on its own, so a ship coasting at
+  0.74 c reads 0 g while its clock still runs slow.
+- **Arrival burn.** With auto-brake on, the ship flips when the remaining distance equals the
+  relativistic stopping distance `(c²/a)(cosh η − 1)` and decelerates into the destination.
+- **Cameras.** One scene, four synchronized rigs — first-person cockpit, tracking observer,
+  chase view with adjustable distance and angle, and a top-down system map you can orbit and
+  zoom. Split-screen shows Point A and Point B side by side, each with its own camera and its
+  own clock, from the same simulation state.
+- **Simplifications, labelled in the app:** a 100 km atmospheric shell, a fixed ship mass, no
+  destination gravity well, no orbital motion and no tidal effects. Playback compresses the
+  mission timeline (the ascent runs in seconds, the interstellar leg in years) without
+  changing the physics, and route length is still the radial separation of the two catalog
+  distances from Earth.
+
 ## Project structure
 
 ```
@@ -71,7 +110,11 @@ src/
   lib/planet.js           classification, palettes, procedural textures, star colour
   lib/aging.js            biological stages
   lib/simulation.js       localStorage mission log
+  lib/labPhysics.js       relativistic helpers, clock formatting, planet frames
+  lib/launchPhysics.js    launch integrator: thrust, fuel, phases, proper time, telemetry
+  lib/labCatalog.js       lab stations (Earth + archive worlds) and route distances
   components/             scene, HUD, picker, flight plan, journey, debrief
+  components/lab/         launch console: scene + camera rigs, controls, config, telemetry, education
 ```
 
 ## Roadmap

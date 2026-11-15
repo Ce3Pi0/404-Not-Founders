@@ -34,7 +34,7 @@ function Brand() {
   )
 }
 
-export default function Header({ step, sim, onAbout, onReset }) {
+export default function Header({ step, sim, onAbout, onReset, inLab = false, onOpenLab }) {
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-void/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 lg:px-8">
@@ -70,17 +70,27 @@ export default function Header({ step, sim, onAbout, onReset }) {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          <div className="hidden items-center gap-3 rounded-lg border border-line/70 bg-white/[0.02] px-3 py-1.5 sm:flex">
-            <div>
-              <div className="text-[9px] tracking-[0.16em] text-muted uppercase">Earth</div>
-              <div className="num text-[11px] text-ink">{formatYears(sim.earthYears)}</div>
+          {!inLab && (
+            <div className="hidden items-center gap-3 rounded-lg border border-line/70 bg-white/[0.02] px-3 py-1.5 sm:flex">
+              <div>
+                <div className="text-[9px] tracking-[0.16em] text-muted uppercase">Earth</div>
+                <div className="num text-[11px] text-ink">{formatYears(sim.earthYears)}</div>
+              </div>
+              <div className="h-6 w-px bg-line" />
+              <div>
+                <div className="text-[9px] tracking-[0.16em] text-muted uppercase">Ship</div>
+                <div className="num text-[11px] text-ion">{formatYears(sim.shipYears)}</div>
+              </div>
             </div>
-            <div className="h-6 w-px bg-line" />
-            <div>
-              <div className="text-[9px] tracking-[0.16em] text-muted uppercase">Ship</div>
-              <div className="num text-[11px] text-ion">{formatYears(sim.shipYears)}</div>
-            </div>
-          </div>
+          )}
+          <button
+            type="button"
+            className={`btn px-3 py-1.5 text-xs ${inLab ? 'btn-primary' : ''}`}
+            onClick={onOpenLab}
+            aria-pressed={inLab}
+          >
+            {inLab ? '← Mission' : 'Relativity Lab'}
+          </button>
           <button type="button" className="btn px-3 py-1.5 text-xs" onClick={onAbout}>
             About
           </button>
