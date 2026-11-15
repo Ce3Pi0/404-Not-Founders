@@ -1,26 +1,6 @@
-import { formatYears } from '../../../lib/physics'
+import { formatNumber, formatYears } from '../../../lib/physics'
 import { FLIGHT_TIMELINE_SECONDS, PLAYBACK_RATES } from '../../../lib/flight'
-
-const CAMERAS = [
-  {
-    id: 'external',
-    label: 'External',
-    blurb: "Bird's-eye follow",
-    detail: 'Follow the spacecraft from outside: the route, both systems and its place on the line.',
-  },
-  {
-    id: 'observer',
-    label: 'Departure Observer',
-    blurb: 'Watch it leave',
-    detail: 'A fixed vantage near the departure system, with the reference-frame clock and an optional delayed-signal view.',
-  },
-  {
-    id: 'cockpit',
-    label: 'Cockpit',
-    blurb: 'Forward view',
-    detail: 'First-person view from the spacecraft, looking down the route with the onboard clock and speed.',
-  },
-]
+import { PERSPECTIVES } from '../../../lib/flightViews'
 
 function ControlButton({ children, onClick, disabled, primary = false }) {
   return (
@@ -35,13 +15,26 @@ function ControlButton({ children, onClick, disabled, primary = false }) {
   )
 }
 
+function StatusDot({ playing, arrived }) {
+  if (arrived) return <span className="h-1.5 w-1.5 rounded-full bg-ink" />
+  return (
+    <span
+      className={`h-1.5 w-1.5 rounded-full bg-ion ${playing ? 'pulse-soft' : 'opacity-60'}`}
+    />
+  )
+}
+
 export default function FlightControls({
-  camera,
-  onCameraChange,
+  singleView,
+  onViewChange,
+  layout,
+  hasObserver,
   started,
   playing,
   progress,
   arrived,
+  status,
+  remainingLy,
   rate,
   onRateChange,
   onStart,
@@ -58,6 +51,16 @@ export default function FlightControls({
 
   return (
     <div className="space-y-2.5 border-t border-line/50 px-3 py-3 sm:px-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-ink/60">
+        <span className="flex items-center gap-1.5 rounded-full border border-line/60 bg-void/60 px-2.5 py-1">
+          <StatusDot playing={playing} arrived={arrived} />
+          {status}
+        </span>
+        <span className="num rounded-full border border-line/60 bg-void/60 px-2.5 py-1 text-ink/75">
+          {formatNumber(remainingLy, remainingLy < 1 ? 5 : 2)} ly to go
+        </span>
+      </div>
+
       <div>
         <div className="flex items-center justify-between text-[9px] tracking-[0.12em] text-ink/50 uppercase">
           <span className="truncate">{originName}</span>
@@ -108,37 +111,48 @@ export default function FlightControls({
       </div>
 
       <div className="flex flex-wrap items-stretch gap-2">
-        <div
-          role="radiogroup"
-          aria-label="Camera perspective"
-          className="grid min-w-[240px] flex-1 grid-cols-3 gap-1.5"
-        >
-          {CAMERAS.map((entry) => {
-            const active = entry.id === camera
-            return (
-              <button
-                key={entry.id}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                title={entry.detail}
-                onClick={() => onCameraChange(entry.id)}
-                className={`rounded-lg border px-2 py-1.5 text-left transition ${
-                  active
-                    ? 'border-ion/70 bg-ion/15 text-ink'
-                    : 'border-line/60 bg-void/40 text-ink/65 hover:border-line hover:text-ink'
-                }`}
-              >
-                <span className="block text-[10px] leading-tight font-semibold">{entry.label}</span>
-                <span className="mt-0.5 block text-[8px] tracking-[0.06em] text-ink/45 uppercase">
-                  {entry.blurb}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+        {layout === 'single' ? (
+          <div
+            role="radiogroup"
+            aria-label="Camera perspective"
+            className="grid min-w-[240px] flex-1 grid-cols-3 gap-1.5"
+          >
+            {PERSPECTIVES.map((entry) => {
+              const active = entry.id === singleView
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  title={entry.detail}
+                  onClick={() => onViewChange(entry.id)}
+                  className={`rounded-lg border px-2 py-1.5 text-left transition ${
+                    active
+                      ? 'border-ion/70 bg-ion/15 text-ink'
+                      : 'border-line/60 bg-void/40 text-ink/65 hover:border-line hover:text-ink'
+                  }`}
+                >
+                  <span className="block text-[10px] leading-tight font-semibold">
+                    {entry.label}
+                  </span>
+                  <span className="mt-0.5 block text-[8px] tracking-[0.06em] text-ink/45 uppercase">
+                    {entry.blurb}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <p className="flex-1 rounded-lg border border-line/50 bg-void/40 px-2.5 py-2 text-[9px] leading-relaxed text-ink/45">
+            {layout === 'split'
+              ? 'Each panel has its own camera menu — choose any two of bird’s-eye, departure observer and cockpit. Picking the perspective already in the other panel swaps the two.'
+              : 'Three panels fixed in order: bird’s-eye on the left, departure observer in the centre, spacecraft cockpit on the right.'}{' '}
+            All panels share one simulation, so pause affects every view.
+          </p>
+        )}
 
-        {camera === 'observer' && (
+        {hasObserver && (
           <div className="flex items-center gap-2 rounded-lg border border-line/60 bg-void/40 px-2.5">
             <span className="text-[9px] leading-tight tracking-[0.1em] text-ink/45 uppercase">
               Delayed

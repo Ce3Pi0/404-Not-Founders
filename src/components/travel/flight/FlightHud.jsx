@@ -1,25 +1,33 @@
 import { formatDays, formatNumber, formatYears } from '../../../lib/physics'
+import { LAYOUTS } from '../../../lib/flightViews'
+import InfoTip from './InfoTip'
 
 function ly(value) {
   return `${formatNumber(value, value < 1 ? 5 : 2)} ly`
 }
 
-function Stat({ label, value, note }) {
+function Stat({ label, value, note, tip, tipLabel }) {
   return (
     <div className="rounded-lg border border-line/50 bg-void/50 px-2.5 py-2">
-      <div className="text-[8px] tracking-[0.14em] text-ink/45 uppercase">{label}</div>
+      <div className="flex items-start justify-between gap-1">
+        <div className="text-[8px] tracking-[0.14em] text-ink/45 uppercase">{label}</div>
+        {tip && <InfoTip label={tipLabel ?? `About ${label.toLowerCase()}`}>{tip}</InfoTip>}
+      </div>
       <div className="num mt-0.5 text-[14px] text-ink">{value}</div>
       <div className="mt-0.5 text-[9px] text-ink/40">{note}</div>
     </div>
   )
 }
 
-function ClockCard({ label, note, years, accent = false }) {
+function ClockCard({ label, note, years, accent = false, tip, tipLabel }) {
   return (
     <div
       className={`rounded-xl border px-2.5 py-2 ${accent ? 'border-ion/60 bg-ion/[0.12]' : 'border-line/55 bg-void/60'}`}
     >
-      <div className="text-[8px] tracking-[0.14em] text-ink/45 uppercase">{label}</div>
+      <div className="flex items-start justify-between gap-1">
+        <div className="text-[8px] tracking-[0.14em] text-ink/45 uppercase">{label}</div>
+        {tip && <InfoTip label={tipLabel ?? `About the ${label.toLowerCase()} clock`}>{tip}</InfoTip>}
+      </div>
       <div className="num mt-1 text-[19px] leading-none text-ink">{formatYears(years)}</div>
       <div className="num mt-1 text-[9px] text-ink/50">{formatDays(years)}</div>
       <div className="mt-0.5 text-[8px] text-ink/35">{note}</div>
@@ -31,7 +39,15 @@ function DelayedSignal({ enabled, onChange, delayYears, retardedPercent, shipNam
   return (
     <div className="rounded-xl border border-line/50 bg-void/50 px-2.5 py-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[8px] tracking-[0.14em] text-ink/45 uppercase">Delayed signal</span>
+        <div className="flex items-center gap-1">
+          <span className="text-[8px] tracking-[0.14em] text-ink/45 uppercase">Delayed signal</span>
+          <InfoTip label="How the delayed light is timed">
+            The timing is calculated, not illustrative. Light emitted at reference time{' '}
+            <em>t_e</em> from distance <em>β·t_e</em> reaches the departure system at{' '}
+            <em>t_e + β·t_e</em>; setting that equal to the observer's time gives{' '}
+            <em>t_e = t / (1 + β)</em>, so the marker sits at progress <em>p / (1 + β)</em>.
+          </InfoTip>
+        </div>
         <button
           type="button"
           role="switch"
@@ -51,15 +67,52 @@ function DelayedSignal({ enabled, onChange, delayYears, retardedPercent, shipNam
       </div>
       <p className="mt-1.5 text-[9px] leading-relaxed text-ink/50">
         {enabled
-          ? `White marker: the ship's image that left it ${formatYears(delayYears)} ago, at ${retardedPercent.toFixed(1)}% of the route. Light from a ship still leaving is always behind where the simulation has it now.`
-          : `The live simulated position is drawn at full detail. Enable this to also show the retarded image of ${shipName} as the departure observer's light would deliver it.`}
+          ? `Departed-light marker: the ship's image that left it ${formatYears(delayYears)} ago, at ${retardedPercent.toFixed(1)}% of the route. Light from a ship still leaving is always behind where the simulation has it now.`
+          : `The live simulated position is drawn at full detail. Enable this to also show the retarded image of ${shipName} in the departure observer's light.`}
       </p>
     </div>
   )
 }
 
+/** Layout selector, bottom-right of the flight HUD. */
+function LayoutPicker({ layout, onChange }) {
+  const active = LAYOUTS.find((entry) => entry.id === layout) ?? LAYOUTS[0]
+  return (
+    <div className="flex items-end justify-between gap-2 border-t border-line/50 pt-2">
+      <div className="min-w-0">
+        <div className="text-[8px] tracking-[0.14em] text-ink/45 uppercase">Camera layout</div>
+        <div className="mt-0.5 text-[8px] leading-tight text-ink/35">
+          {active.blurb} · the journey keeps running
+        </div>
+      </div>
+      <div role="radiogroup" aria-label="Camera layout" className="flex shrink-0 gap-1">
+        {LAYOUTS.map((entry) => {
+          const selected = entry.id === layout
+          return (
+            <button
+              key={entry.id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={`${entry.label} view`}
+              onClick={() => onChange(entry.id)}
+              className={`rounded-lg border px-2 py-1 text-[10px] leading-none transition ${
+                selected
+                  ? 'border-ion/70 bg-ion/20 text-ink'
+                  : 'border-line/60 bg-void/50 text-ink/60 hover:border-line hover:text-ink'
+              }`}
+            >
+              {entry.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 /** First-person cockpit glass: forward view, onboard clock and speed. */
-export function CockpitOverlay({ clock, shipName }) {
+export function CockpitOverlay({ clock, shipName, compact = false }) {
   return (
     <div className="pointer-events-none absolute inset-0 z-10">
       <div className="absolute top-3 left-3 h-7 w-7 border-t border-l border-ink/25" />
@@ -67,22 +120,36 @@ export function CockpitOverlay({ clock, shipName }) {
       <div className="absolute bottom-3 left-3 h-7 w-7 border-b border-l border-ink/25" />
       <div className="absolute right-3 bottom-3 h-7 w-7 border-r border-b border-ink/25" />
 
-      <div className="absolute top-1/2 left-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-ion/30">
+      <div
+        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-ion/30 ${
+          compact ? 'h-14 w-14' : 'h-24 w-24'
+        }`}
+      >
         <div className="absolute top-1/2 left-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink/90" />
-        <div className="absolute top-1/2 left-1/2 h-px w-16 -translate-x-1/2 -translate-y-1/2 bg-ink/20" />
-        <div className="absolute top-1/2 left-1/2 h-16 w-px -translate-x-1/2 -translate-y-1/2 bg-ink/20" />
+        <div className="absolute top-1/2 left-1/2 h-px w-10 -translate-x-1/2 -translate-y-1/2 bg-ink/20" />
+        <div className="absolute top-1/2 left-1/2 h-10 w-px -translate-x-1/2 -translate-y-1/2 bg-ink/20" />
       </div>
 
-      <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-2 rounded-xl border border-line/60 bg-void/85 px-3 py-2 backdrop-blur">
-        <div>
-          <div className="text-[8px] tracking-[0.14em] text-ink/45 uppercase">Onboard clock</div>
-          <div className="num mt-0.5 text-[15px] text-ink">{formatYears(clock.shipYears)}</div>
-          <div className="text-[9px] text-ink/45">{shipName} proper time</div>
+      <div
+        className={`absolute inset-x-3 bottom-3 flex items-end justify-between gap-2 rounded-xl border border-line/60 bg-void/85 backdrop-blur ${
+          compact ? 'px-2 py-1.5' : 'px-3 py-2'
+        }`}
+      >
+        <div className="min-w-0">
+          <div className="text-[7px] tracking-[0.14em] text-ink/45 uppercase">Onboard</div>
+          <div className={`num mt-0.5 text-ink ${compact ? 'text-[11px]' : 'text-[15px]'}`}>
+            {formatYears(clock.shipYears)}
+          </div>
+          {!compact && <div className="truncate text-[9px] text-ink/45">{shipName} proper time</div>}
         </div>
-        <div className="text-right">
-          <div className="text-[8px] tracking-[0.14em] text-ink/45 uppercase">Speed</div>
-          <div className="num mt-0.5 text-[15px] text-ink">{clock.beta.toFixed(3)} c</div>
-          <div className="num text-[9px] text-ink/45">{formatNumber(clock.kmS, 0)} km/s</div>
+        <div className="shrink-0 text-right">
+          <div className="text-[7px] tracking-[0.14em] text-ink/45 uppercase">Speed</div>
+          <div className={`num mt-0.5 text-ink ${compact ? 'text-[11px]' : 'text-[15px]'}`}>
+            {clock.beta.toFixed(3)} c
+          </div>
+          {!compact && (
+            <div className="num text-[9px] text-ink/45">{formatNumber(clock.kmS, 0)} km/s</div>
+          )}
         </div>
       </div>
     </div>
@@ -99,11 +166,14 @@ export default function FlightHud({
   mission,
   clock,
   shipName,
-  camera,
+  layout,
+  onLayoutChange,
   delayed,
   onDelayedChange,
   delayYears,
   retardedPercent,
+  showDelayedSignal,
+  simplified,
 }) {
   return (
     <section className="panel space-y-2 p-3.5">
@@ -119,20 +189,31 @@ export default function FlightHud({
           label="Reference frame"
           note="Departure-system rest frame"
           years={clock.earthYears}
+          tip="A reference frame is the clock and grid of one observer. Here it is the departure system at rest: the ship's speed, distance and arrival time are all measured from it."
+          tipLabel="What a reference frame is"
         />
         <ClockCard
           label="Spacecraft proper"
           note={`${shipName} frame`}
           years={clock.shipYears}
           accent
+          tip="Proper time is what the crew's own clock reads. A clock moving through a frame ticks slower by 1/γ, so at 0.8 c the crew ages about 0.6 years for every year that passes at home."
+          tipLabel="Why the spacecraft clock runs slow"
         />
       </div>
 
       <div className="rounded-xl border border-line/55 bg-void/60 px-2.5 py-2">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-[8px] tracking-[0.14em] text-ink/45 uppercase">
-            Accumulated age difference
-          </span>
+          <div className="flex items-center gap-1">
+            <span className="text-[8px] tracking-[0.14em] text-ink/45 uppercase">
+              Accumulated age difference
+            </span>
+            <InfoTip label="Why the two clocks disagree">
+              Both clocks start together. The ship's path through spacetime is shorter than the
+              departure system's, so it accumulates less time — the classical twin effect. It is a
+              real difference between worldlines, not a display error.
+            </InfoTip>
+          </div>
           <span className="num text-[13px] text-ink/90">{formatYears(clock.driftYears)}</span>
         </div>
         <div className="mt-0.5 text-[9px] text-ink/40">
@@ -146,7 +227,13 @@ export default function FlightHud({
           value={`${clock.beta.toFixed(3)} c`}
           note={`${formatNumber(clock.kmS, 0)} km/s`}
         />
-        <Stat label="Lorentz factor" value={clock.gamma.toFixed(3)} note="1 / √(1 − β²)" />
+        <Stat
+          label="Lorentz factor"
+          value={clock.gamma.toFixed(3)}
+          note="1 / √(1 − β²)"
+          tip="γ is the factor behind time dilation and length contraction: at higher cruise speeds it grows faster, so the gap between the two clocks widens for the same route."
+          tipLabel="Why faster ships age less"
+        />
         <Stat
           label="Distance remaining"
           value={ly(clock.remainingLy)}
@@ -173,7 +260,7 @@ export default function FlightHud({
         changes the animation.
       </p>
 
-      {camera === 'observer' && (
+      {showDelayedSignal && (
         <DelayedSignal
           enabled={delayed}
           onChange={onDelayedChange}
@@ -181,6 +268,15 @@ export default function FlightHud({
           retardedPercent={retardedPercent}
           shipName={shipName}
         />
+      )}
+
+      <LayoutPicker layout={layout} onChange={onLayoutChange} />
+
+      {simplified && (
+        <p className="text-[8px] leading-relaxed text-ink/30">
+          Simplified graphics on this device: fewer stars, no antialiasing and a capped pixel ratio
+          to keep every panel smooth.
+        </p>
       )}
     </section>
   )

@@ -23,11 +23,13 @@ Built by **404 Not Founders** for **Hack The Nest** — second playable draft.
   the slider moves. Change either endpoint, return to Earth, or launch.
 
 - **Fly** — a cinematic Live Flight scene on the real light-year route between the two systems:
-  a spacecraft travelling from departure to arrival on an accelerated timeline, three switchable
-  camera perspectives (external bird's-eye, departure observer with an optional delayed-signal
-  view, and the spacecraft cockpit), start / pause / resume / restart and playback controls, and a
-  relativity HUD whose reference and proper clocks both derive from the same progress value.
-  Arrival offers Explore This System, Choose Another Destination, or Return to Earth.
+  a spacecraft travelling from departure to arrival on an accelerated timeline and three camera
+  perspectives (bird's-eye, departure observer with an optional delayed-signal view, and the
+  spacecraft cockpit) in a single, two-way split or three-way split layout, start / pause / resume /
+  restart and playback controls, and a relativity HUD whose reference and proper clocks both derive
+  from the same progress value. Every panel renders from one shared simulation, so pause, layout
+  changes and camera assignment never reset the journey. Arrival offers Explore This System, Choose
+  Another Destination, or Return to Earth.
 - **Go home** — a go-home button (header, planet view and arrival panel) always returns you to
   Earth.
 - **Learn** — Live Flight's relativity HUD and arrival summary show elapsed time in both frames,
@@ -133,7 +135,7 @@ speed control attached to it.
 
 ## Live Flight
 
-`LiveFlight` (`src/components/travel/LiveFlight.jsx`, `flight/FlightScene.jsx`) replaces the old
+`LiveFlight` (`src/components/travel/LiveFlight.jsx`, `flight/FlightStage.jsx`) replaces the old
 top-down journey with the animated interstellar run between the Travel Planner's two systems.
 
 - **Route** — the scene draws both host stars at their exact RA/Dec Cartesian positions in
@@ -144,10 +146,25 @@ top-down journey with the animated interstellar run between the Travel Planner's
   The whole trip takes 24 s at 1× playback; 0.5×, 1×, 2× and 4× only change how fast that fraction
   moves. Both clocks are `progress × total duration`, so they agree at every instant:
   `t_ref = p·d/β`, `t_ship = p·t_ref/γ`, `Δ = p·(t_ref − t_ship)`.
-- **Cameras** — *External* follows from outside with the route and both systems in frame;
-  *Departure Observer* watches from near the origin and offers a delayed-signal view; *Cockpit* is
-  a first-person forward view with an onboard clock and speed overlay. The selector switches
-  between them live.
+- **Cameras** — *Bird's-eye* follows from outside with the route and both systems in frame;
+  *Departure observer* watches from near the origin and offers a delayed-signal view; *Cockpit* is
+  a first-person forward view with an onboard clock and speed overlay. Bird's-eye and departure
+  observer take independent orbit and zoom gestures; the cockpit is fixed forward.
+- **Layouts** — the layout selector at the bottom-right of the HUD switches between one full-size
+  view (any perspective), a two-way split with a camera menu on each panel (choosing the
+  perspective already in the other panel swaps them), and the three-way split fixed as bird's-eye /
+  departure observer / cockpit. One `<Canvas>`, one scene and one set of geometries and textures
+  serve every panel: each panel is a scissored viewport rendered from its own camera, so resources
+  are shared and panel rectangles are re-measured whenever the layout or window resizes. Switching
+  layout keeps the journey, both clocks and each perspective's own framing untouched.
+- **Shared simulation** — every panel reads the same `progressRef`, spacecraft position, velocity
+  and clock values, so pause/resume and playback speed affect all views at once.
+- **Teaching notes** — compact `?` tooltips in the HUD and panels explain reference frames, proper
+  time, why the clocks diverge, why faster ships accumulate less proper time and why distant
+  observers see delayed light (with the light-travel calculation behind the marker).
+- **Fallback** — devices reporting four or fewer cores or little memory draw fewer stars, no
+  antialiasing and a capped pixel ratio (noted in the HUD); browsers without WebGL get an
+  explanatory panel instead of a blank stage.
 - **Delayed signal** — for the constant-speed outbound leg, light emitted at reference time `t_e`
   from distance `β·t_e` reaches the origin at `t_e + β·t_e`. Setting that equal to the observer's
   current time gives `t_e = t/(1+β)`, so the retarded marker sits at progress `p/(1+β)`. This is a
@@ -274,7 +291,7 @@ src/
   lib/webgl.js            one-time WebGL availability probe
   components/             scene, crew figures, HUD, picker, travel planner, debrief
   components/travel/      Travel Planner, system picker, Live Flight page and HUD
-  components/travel/flight/  Live Flight 3D scene and camera rigs
+  components/travel/flight/  Live Flight multi-camera stage, view panels, HUD and camera maths
   components/map/         3D universe map and the AU-scale Star System Explorer scene
   components/PlanetDetailView.jsx  /planet/:id record page and its portrait
   components/lab/         launch console: scene + camera rigs, controls, config, telemetry, education

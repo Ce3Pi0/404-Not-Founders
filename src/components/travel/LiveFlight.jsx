@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import FlightScene from './flight/FlightScene'
-import FlightHud, { CockpitOverlay } from './flight/FlightHud'
+import FlightStage from './flight/FlightStage'
+import FlightHud from './flight/FlightHud'
 import FlightControls from './flight/FlightControls'
 import {
   FLIGHT_TIMELINE_SECONDS,
@@ -8,26 +8,13 @@ import {
   retardedProgress,
   yearsPerPlaybackSecond,
 } from '../../lib/flight'
+import { layoutViews, viewsInclude } from '../../lib/flightViews'
+import { SIMPLIFIED_GRAPHICS } from '../../lib/webgl'
 import { formatNumber, formatYears } from '../../lib/physics'
 import { travelSystemFor } from '../../lib/starMap'
 
 /** Arrival flourish before the action panel takes over. */
 const ARRIVAL_TRANSITION_MS = 1200
-
-const CAMERA_LABEL = {
-  external: "External · bird's-eye",
-  observer: 'Departure Observer',
-  cockpit: 'Spacecraft cockpit',
-}
-
-function StatusDot({ playing, arrived }) {
-  if (arrived) return <span className="h-1.5 w-1.5 rounded-full bg-ink" />
-  return (
-    <span
-      className={`h-1.5 w-1.5 rounded-full bg-ion ${playing ? 'pulse-soft' : 'opacity-60'}`}
-    />
-  )
-}
 
 function ArrivalPanel({
   mission,
@@ -76,7 +63,11 @@ function ArrivalPanel({
           <button type="button" className="btn btn-primary w-full py-2 text-[12px]" onClick={onExplore}>
             Explore This System
           </button>
-          <button type="button" className="btn w-full py-2 text-[12px]" onClick={onChooseDestination}>
+          <button
+            type="button"
+            className="btn w-full py-2 text-[12px]"
+            onClick={onChooseDestination}
+          >
             Choose Another Destination
           </button>
           {backToEarth && (
@@ -94,11 +85,12 @@ function ArrivalPanel({
  * Live Flight — the animated interstellar exploration run between the Travel
  * Planner's departure and destination systems.
  *
- * One requestAnimationFrame clock advances a single `progressRef`. The 3D scene
- * reads that ref every frame; the HUD samples it into React state and derives
- * both clocks from that same fraction via `flightClock`. Mission distance and
- * durations come from the planner untouched, so changing playback speed moves
- * the picture, never the physics.
+ * One requestAnimationFrame clock advances a single `progressRef`. Every camera
+ * panel renders from that one ref, and both clocks are derived from the same
+ * fraction via `flightClock`, so the layout, playback and pause controls can
+ * never pull the views apart. Mission distance and durations come from the
+ * planner untouched, so changing playback speed moves the picture, never the
+ * physics.
  */
 export default function LiveFlight({
   mission,
@@ -127,7 +119,9 @@ export default function LiveFlight({
   const [started, setStarted] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [rate, setRate] = useState(1)
-  const [camera, setCamera] = useState('external')
+  const [layout, setLayout] = useState('single')
+  const [singleView, setSingleView] = useState('external')
+  const [splitViews, setSplitViews] = useState(['external', 'observer'])
   const [delayed, setDelayed] = useState(true)
   const [arriving, setArriving] = useState(false)
   const [arrived, setArrived] = useState(false)
@@ -200,11 +194,42 @@ export default function LiveFlight({
     setPlaying(true)
   }
 
+  /* Panels for the current layout. Switching layout only re-arranges them. */
+  const views = useMemo(
+    () => layoutViews(layout, singleView, splitViews),
+    [layout, singleView, splitViews],
+  )
+  const hasObserver = viewsInclude(views, 'observer')
+
+  /** Assign a perspective to one panel; in split view the two panels swap. */
+  const assignPerspective = (index, perspective) => {
+    if (layout === 'single') {
+      setSingleView(perspective)
+      return
+    }
+    if (layout !== 'split') return
+    setSplitViews((current) => {
+      const next = [...current]
+      const other = index === 0 ? 1 : 0
+      if (next[other] === perspective) next[other] = next[index]
+      next[index] = perspective
+      return next
+    })
+  }
+
   const clock = flightClock(mission, progress)
   const delayedClock = flightClock(mission, retardedProgress(progress, mission.beta))
   const delayYears = clock.earthYears - delayedClock.earthYears
   const yearsPerSecond = yearsPerPlaybackSecond(mission, rate)
-  const status = arrived ? 'Arrived' : arriving ? 'Arrival' : !started ? 'Ready' : playing ? 'In transit' : 'Paused'
+  const status = arrived
+    ? 'Arrived'
+    : arriving
+      ? 'Arrival'
+      : !started
+        ? 'Ready'
+        : playing
+          ? 'In transit'
+          : 'Paused'
   const originName = originEntry?.name ?? origin.name
   const destinationName = destinationEntry?.name ?? destination.name
 
@@ -237,40 +262,23 @@ export default function LiveFlight({
       <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_330px]">
         <div className="panel overflow-hidden">
           <div className="relative h-[52vh] min-h-[420px] w-full">
-            <FlightScene
+            <FlightStage
+              views={views}
+              layout={layout}
               origin={originEntry}
               destination={destinationEntry}
-              cameraMode={camera}
               beta={mission.beta}
               progressRef={progressRef}
               delayed={delayed}
+              clock={clock}
+              shipName={shipName}
+              onAssignPerspective={assignPerspective}
             />
-
-            <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex flex-wrap items-start justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="flex items-center gap-1.5 rounded-full border border-line/70 bg-void/85 px-2.5 py-1 text-[10px] text-ink backdrop-blur">
-                  <StatusDot playing={playing} arrived={arrived} />
-                  {status}
-                </span>
-                <span className="rounded-full border border-line/60 bg-void/80 px-2.5 py-1 text-[10px] text-ink/70 backdrop-blur">
-                  {CAMERA_LABEL[camera]}
-                </span>
-              </div>
-              <span className="num rounded-full border border-line/60 bg-void/85 px-2.5 py-1 text-[10px] text-ink/75 backdrop-blur">
-                {formatNumber(clock.remainingLy, mission.distanceLy < 1 ? 5 : 2)} ly to go
-              </span>
-            </div>
-
-            {camera === 'cockpit' && !arrived && (
-              <CockpitOverlay clock={clock} shipName={shipName} />
-            )}
 
             {arriving && (
               <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-void/75">
                 <div className="arrival-bloom text-center">
-                  <div className="text-[9px] tracking-[0.24em] text-ink/55 uppercase">
-                    Arriving
-                  </div>
+                  <div className="text-[9px] tracking-[0.24em] text-ink/55 uppercase">Arriving</div>
                   <div className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
                     {destinationName}
                   </div>
@@ -292,12 +300,16 @@ export default function LiveFlight({
           </div>
 
           <FlightControls
-            camera={camera}
-            onCameraChange={setCamera}
+            singleView={singleView}
+            onViewChange={setSingleView}
+            layout={layout}
+            hasObserver={hasObserver}
             started={started}
             playing={playing}
             progress={progress}
             arrived={arrived}
+            status={status}
+            remainingLy={clock.remainingLy}
             rate={rate}
             onRateChange={setRate}
             onStart={start}
@@ -316,11 +328,14 @@ export default function LiveFlight({
           mission={mission}
           clock={clock}
           shipName={shipName}
-          camera={camera}
+          layout={layout}
+          onLayoutChange={setLayout}
           delayed={delayed}
           onDelayedChange={setDelayed}
           delayYears={delayYears}
           retardedPercent={delayedClock.progress * 100}
+          showDelayedSignal={hasObserver}
+          simplified={SIMPLIFIED_GRAPHICS}
         />
       </div>
     </section>
