@@ -10,8 +10,11 @@ import RelativityLab from './components/lab/RelativityLab'
 import StarMapView from './components/map/StarMapView'
 import SystemView from './components/map/SystemView'
 import PlanetDetailView from './components/PlanetDetailView'
+import ChallengeShell from './components/challenge/ChallengeShell'
 import {
+  CHALLENGE_PATHS,
   TRAVEL_PATH,
+  challengeRouteFromPath,
   isTravelPath,
   navigate,
   planetIdFromPath,
@@ -48,6 +51,7 @@ export default function App() {
   // The deep links own their screens: /system/:id, /planet/:id and /travel
   // render even on a cold load or a browser reload, with the step machine for
   // everything else.
+  const challengeRoute = challengeRouteFromPath(pathname)
   const pathSystem = systemById(systemIdFromPath(pathname))
   const pathPlanetId = planetIdFromPath(pathname)
   const step = pathSystem
@@ -251,6 +255,9 @@ export default function App() {
     goTo('destination')
   }
 
+  // Expedition Challenge is its own mode with its own shell and store.
+  if (challengeRoute) return <ChallengeShell route={challengeRoute} />
+
   return (
     <div className="flex min-h-full flex-col">
       <Header
@@ -289,6 +296,7 @@ export default function App() {
                 navigate('/')
                 setStepState('map')
               }}
+              onStartChallenge={() => navigate(CHALLENGE_PATHS.intro)}
             />
           </div>
         )}
@@ -312,6 +320,7 @@ export default function App() {
               onSetOrigin={mapSetOrigin}
               onExplore={exploreSystem}
               onExit={() => goTo('destination')}
+              onStartChallenge={() => navigate(CHALLENGE_PATHS.intro)}
             />
           ))}
 

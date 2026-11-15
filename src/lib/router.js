@@ -9,6 +9,27 @@ import { useEffect, useState } from 'react'
 
 export const TRAVEL_PATH = '/travel'
 
+/* Expedition Challenge routes. The challenge is its own mode with its own
+ * state, so it owns whole URL paths rather than steps inside the mission flow. */
+export const CHALLENGE_PATHS = {
+  intro: '/challenge',
+  plan: '/challenge/plan',
+  flight: '/challenge/flight',
+  stop: '/challenge/stop',
+  result: '/challenge/result',
+}
+
+/** Which challenge screen the current URL is, or null outside the mode. */
+export function challengeRouteFromPath(pathname) {
+  const path = (pathname ?? '').replace(/\/+$/, '') || '/'
+  if (path === CHALLENGE_PATHS.intro) return 'intro'
+  if (path === CHALLENGE_PATHS.plan) return 'plan'
+  if (path === CHALLENGE_PATHS.flight) return 'flight'
+  if (path === CHALLENGE_PATHS.stop) return 'stop'
+  if (path === CHALLENGE_PATHS.result) return 'result'
+  return null
+}
+
 export function navigate(path, { replace = false } = {}) {
   if (window.location.pathname === path) return
   window.history[replace ? 'replaceState' : 'pushState']({}, '', path)

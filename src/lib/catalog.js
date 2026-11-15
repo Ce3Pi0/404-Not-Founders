@@ -8,7 +8,12 @@ const DEG = Math.PI / 180;
 /* ------------------------------------------------------------------ *
  * CSV parsing — the archive extract is the single source of truth.
  * Columns: pl_name, hostname, ra, dec, sy_dist (pc), pl_orbsmax (AU),
- * pl_orbper (days).
+ * pl_orbper (days), pl_bmasse (M⊕), pl_bmassprov, pl_rade (R⊕), st_mass (M☉).
+ *
+ * `massEarth` / `radiusEarth` below are the app's illustrative bulk estimates.
+ * The measured archive values live in `massEarthMeasured` /
+ * `radiusEarthMeasured` and are the only ones the challenge's escape-energy
+ * model will ever use.
  * ------------------------------------------------------------------ */
 
 function parseCsv(text) {
@@ -127,6 +132,22 @@ function deriveStar(name, semiMajorAxisAu, orbitalPeriodDays) {
   };
 }
 
+/**
+ * The archive reports where a mass comes from. Minimum masses (M sin i) and
+ * mass–radius relations are kept labelled so the challenge never presents them
+ * as direct measurements.
+ */
+function normalizeMassSource(value) {
+  if (!value) return null
+  const text = value.trim()
+  if (/^mass$/i.test(text)) return 'Measured mass'
+  if (/msini|sin\s*\(?\s*i/i.test(text)) return 'Minimum mass (M sin i)'
+  if (/m-r|mass.?radius/i.test(text)) return 'Mass–radius relation estimate'
+  return text
+}
+
+const isMinimumMass = (value) => Boolean(value) && /msini|sin\s*\(?\s*i/i.test(value)
+
 /** Bulk properties are absent from the extract; estimated deterministically. */
 function deriveBulk(name, eqTempK) {
   const rand = mulberry32(hashString(`${name}-bulk`));
@@ -162,6 +183,11 @@ export const EARTH = {
   orbitalPeriodDays: 365.25,
   radiusEarth: 1,
   massEarth: 1,
+  radiusEarthMeasured: 1,
+  massEarthMeasured: 1,
+  massSource: 'Earth reference constants',
+  massIsMinimum: false,
+  starMassSunMeasured: 1,
   densityGcc: 5.51,
   eqTempK: 255,
   starMassSun: 1,
@@ -196,6 +222,9 @@ const EXOPLANETS = lines
           )
         : null;
     const bulk = deriveBulk(name, eqTempK);
+    const massProvenance = cell(line, "pl_bmassprov");
+    const massEarthMeasured = num(line, "pl_bmasse");
+    const radiusEarthMeasured = num(line, "pl_rade");
 
     return {
       id: `x-${slug(name)}-${index}`,
@@ -212,6 +241,13 @@ const EXOPLANETS = lines
       semiMajorAxisAu,
       orbitalPeriodDays,
       eqTempK: eqTempK == null ? null : Math.round(eqTempK),
+      // The archive's own measurements, kept apart from the illustrative bulk
+      // estimates so no interface confuses the two.
+      massEarthMeasured: massEarthMeasured ?? null,
+      radiusEarthMeasured: radiusEarthMeasured ?? null,
+      massSource: normalizeMassSource(massProvenance),
+      massIsMinimum: isMinimumMass(massProvenance),
+      starMassSunMeasured: num(line, "st_mass"),
       ...starProps,
       ...bulk,
       position: positionVector(ra, dec, distancePc),
