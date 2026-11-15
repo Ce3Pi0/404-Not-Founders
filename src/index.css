@@ -163,6 +163,31 @@ input[type="range"].slider::-moz-range-track {
   background: transparent;
 }
 
+/*
+ * Lab sliders opt into a filled rail: the component sets --pct on the input and
+ * these pseudo-elements inherit it. Vendor rules stay separate — a selector
+ * list mixing ::-webkit-* and ::-moz-* is dropped whole by Chromium.
+ */
+input[type="range"].slider-fill::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    #9a0680 0% var(--pct, 0%),
+    rgba(255, 255, 255, 0.14) var(--pct, 0%) 100%
+  );
+}
+
+input[type="range"].slider-fill::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    #9a0680 0% var(--pct, 0%),
+    rgba(255, 255, 255, 0.14) var(--pct, 0%) 100%
+  );
+}
+
 input[type="range"].slider::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;

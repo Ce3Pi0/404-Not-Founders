@@ -3,6 +3,7 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { formatDays, formatNumber, formatYears, C_KM_S } from '../lib/physics'
 import { createPlanetTexture, mulberry32 } from '../lib/planet'
+import { useAppStore } from '../store/appStore'
 
 /* Top-down route: the ship leaves the origin marker and crosses to the
  * destination planet, which grows as the gap closes. */
@@ -217,15 +218,20 @@ function Milestones({ distanceLy }) {
   )
 }
 
-function JourneyStage({ origin, planet, mission, shipName, onArrive }) {
+function JourneyStage() {
+  const origin = useAppStore((state) => state.location)
+  const planet = useAppStore((state) => state.planet)
+  const mission = useAppStore((state) => state.mission)
+  const onArrive = useAppStore((state) => state.arrive)
+  const shipName = mission?.shipName ?? 'Odyssey'
   const [progress, setProgress] = useState(0)
   const finished = useRef(false)
   const arrivedTimer = useRef(null)
   const frame = useRef(0)
   const start = useRef(0)
   const duration = useMemo(
-    () => Math.min(14000, Math.max(6000, 6000 + mission.distanceLy * 60)),
-    [mission.distanceLy],
+    () => Math.min(14000, Math.max(6000, 6000 + (mission?.distanceLy ?? 0) * 60)),
+    [mission?.distanceLy],
   )
 
   useEffect(() => {
@@ -261,12 +267,14 @@ function JourneyStage({ origin, planet, mission, shipName, onArrive }) {
   }, [])
 
   const finish = () => {
-    if (finished.current) return
+    if (!mission || finished.current) return
     finished.current = true
     cancelAnimationFrame(frame.current)
     setProgress(1)
     onArrive()
   }
+
+  if (!mission) return null
 
   const eased = progress * progress * (3 - 2 * progress)
   const travelled = mission.distanceLy * eased
