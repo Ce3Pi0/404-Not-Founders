@@ -67,24 +67,38 @@ destinations are real.
 
 ## Relativity Lab model
 
-The lab solves a one-way trip between two stations that share one inertial frame:
+The lab is an interactive launch simulation. You configure a craft, launch it from a
+planet, and keep changing the mission while it flies.
 
-- The ship leaves Point A at rest, holds a constant **proper acceleration** until it reaches the
-  requested cruise speed (or half the route, whichever comes first), coasts, then decelerates
-  symmetrically into Point B. Coordinate time, distance and velocity come from the closed-form
-  hyperbolic-motion solution; the ship's proper time is integrated along the worldline.
-- Gravitational time dilation uses the weak-field clock rate `√(1 − rₛ/r)` and is integrated while
-  the ship climbs out of, and settles into, each planet's potential well. Deep-space cruise uses 1.
-- Acceleration is **not** treated as a direct cause of time dilation: it alters the ship's proper
-  time only through the velocity it produces and the potential it traverses. G-force is reported
-  separately as `a / 9.80665 m/s²` (current, maximum and flight average).
-- Points A and B are modelled at rest relative to each other, so their clocks differ only by the
-  gravitational rate at each surface. The split screen shows the same mission from both ends of the
-  route — the ship recedes at A, approaches at B — with each observer's elapsed time, distance,
-  light-travel lag and relativistic Doppler factor.
-- Changing the start, destination, speed, acceleration or duration re-solves the profile and replays
-  the flight. Route length is the radial separation of the two catalog distances from Earth (the
-  smallest possible separation); true separations need sky positions the archive export lacks.
+- **The integrator.** State is advanced step by step in the shared rest frame of the two
+  stations. While the ship thrusts, velocity is integrated in rapidity space, which is exact
+  for a constant proper acceleration over a step:
+  `η₁ = asinh(sinh η₀ + a·dt/c)`, `β = tanh η`, `Δτ = (c/a)(η₁ − η₀)`.
+  Nothing is prerecorded: thrust, mass, fuel, target speed, course and the arrival burn all
+  change the trajectory the next frame.
+- **Ascent.** Newtonian climb at the chosen launch angle through a 100 km atmosphere:
+  `dv/dt = a_thrust − g(r)·sin θ`, with `g(r) = g₀(R/r)²` from the planet's mass and radius.
+  Below the surface gravity the craft is held on the pad with an explanation instead of
+  silently failing.
+- **Fuel.** A photon drive (`Isp = c/g₀`), so the burn rate is `thrust/c`; the propellant
+  load caps the total burn time. Running dry shuts the engines down and the ship coasts.
+- **Clocks.** The ship's proper time is integrated along the path actually flown:
+  `dτ = dt · √(1 − v²/c²) · √(1 − rₛ/r)`, with the gravitational factor taken from the launch
+  planet's potential while the ship climbs out of it and 1 in deep space. The launch planet
+  and destination clocks advance at their own surface rates. G-force is proper acceleration
+  ÷ 9.80665 m/s² and never enters the time-dilation integral on its own, so a ship coasting at
+  0.74 c reads 0 g while its clock still runs slow.
+- **Arrival burn.** With auto-brake on, the ship flips when the remaining distance equals the
+  relativistic stopping distance `(c²/a)(cosh η − 1)` and decelerates into the destination.
+- **Cameras.** One scene, four synchronized rigs — first-person cockpit, tracking observer,
+  chase view with adjustable distance and angle, and a top-down system map you can orbit and
+  zoom. Split-screen shows Point A and Point B side by side, each with its own camera and its
+  own clock, from the same simulation state.
+- **Simplifications, labelled in the app:** a 100 km atmospheric shell, a fixed ship mass, no
+  destination gravity well, no orbital motion and no tidal effects. Playback compresses the
+  mission timeline (the ascent runs in seconds, the interstellar leg in years) without
+  changing the physics, and route length is still the radial separation of the two catalog
+  distances from Earth.
 
 ## Project structure
 
@@ -96,10 +110,11 @@ src/
   lib/planet.js           classification, palettes, procedural textures, star colour
   lib/aging.js            biological stages
   lib/simulation.js       localStorage mission log
-  lib/labPhysics.js       Relativity Lab flight solver, proper-time integration, telemetry
+  lib/labPhysics.js       relativistic helpers, clock formatting, planet frames
+  lib/launchPhysics.js    launch integrator: thrust, fuel, phases, proper time, telemetry
   lib/labCatalog.js       lab stations (Earth + archive worlds) and route distances
   components/             scene, HUD, picker, flight plan, journey, debrief
-  components/lab/         flight console: cameras, split screen, dashboard, controls
+  components/lab/         launch console: scene + camera rigs, controls, config, telemetry, education
 ```
 
 ## Roadmap
