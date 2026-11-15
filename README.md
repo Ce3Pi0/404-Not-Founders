@@ -142,3 +142,5 @@ src/
 
 Planetary data: [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/) — a service of
 NASA's Exoplanet Exploration Program.
+Earth imagery: NASA Blue Marble day, cloud, relief and ocean maps (public domain), bundled from the
+three.js example textures in `src/assets/earth`.
