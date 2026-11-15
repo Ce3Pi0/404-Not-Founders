@@ -77,6 +77,22 @@ function positionVector(raDeg, decDeg, parsecs) {
 }
 
 /**
+ * Map frame — right-handed, Y-up, light-years, Solar System at the origin.
+ * This is kept separate from the equatorial parsec vectors above: the map uses
+ * NASA's RA/Dec angles directly (RA → X/Z, Dec → Y) and physical distances, so
+ * display coordinates never feed back into route or travel calculations.
+ */
+export function mapCartesian(raDeg, decDeg, distanceLy) {
+  const ra = raDeg * DEG;
+  const dec = decDeg * DEG;
+  return [
+    distanceLy * Math.cos(dec) * Math.cos(ra),
+    distanceLy * Math.sin(dec),
+    distanceLy * Math.cos(dec) * Math.sin(ra),
+  ];
+}
+
+/**
  * Host-star properties are not in the extract, so they are derived from the
  * orbit with Kepler's third law (M = a³/P²) and standard main-sequence
  * mass–radius–luminosity relations. All derived values are marked as such.
@@ -162,7 +178,8 @@ const EXOPLANETS = lines
     const star = cell(line, "hostname").trim();
     const ra = num(line, "ra") ?? 0;
     const dec = num(line, "dec") ?? 0;
-    const distancePc = num(line, "sy_dist") ?? 0;
+    const measuredPc = num(line, "sy_dist");
+    const distancePc = measuredPc ?? 0;
     const semiMajorAxisAu = num(line, "pl_orbsmax");
     const orbitalPeriodDays = num(line, "pl_orbper");
     const starProps = deriveStar(
@@ -189,6 +206,9 @@ const EXOPLANETS = lines
       dec,
       distancePc,
       distanceLy: distancePc * LY_PER_PC,
+      // `distancePc` keeps its historic 0 fallback so routes and search behave
+      // as before; the map needs to know whether the archive reported one.
+      distanceKnown: measuredPc != null && measuredPc > 0,
       semiMajorAxisAu,
       orbitalPeriodDays,
       eqTempK: eqTempK == null ? null : Math.round(eqTempK),
@@ -220,6 +240,12 @@ export const SYSTEMS = (() => {
         position: planet.position,
         distancePc: planet.distancePc,
         distanceLy: planet.distanceLy,
+        distanceKnown: planet.distanceKnown,
+        // Exact map-frame Cartesian coordinates in light-years (or null when
+        // the archive reported no distance and the system has no real place).
+        mapPosition: planet.distanceKnown
+          ? mapCartesian(planet.ra, planet.dec, planet.distanceLy)
+          : null,
         ra: planet.ra,
         dec: planet.dec,
         planets: [planet],
@@ -231,12 +257,22 @@ export const SYSTEMS = (() => {
     position: [0, 0, 0],
     distancePc: 0,
     distanceLy: 0,
+    distanceKnown: true,
+    mapPosition: [0, 0, 0],
     ra: 0,
     dec: 0,
     planets: [EARTH],
   });
   return map;
 })();
+
+/** Unique host-star systems with a measured distance, in the map frame. */
+export const MAPPED_SYSTEMS = [...SYSTEMS.values()].filter(
+  (system) => system.mapPosition,
+);
+
+/** Systems kept in search/routes but left off the map: distance unknown. */
+export const UNMAPPED_SYSTEM_COUNT = SYSTEMS.size - MAPPED_SYSTEMS.length;
 
 /** Great-unknown route length between two worlds, in light-years. */
 export function distanceLyBetween(from, to) {

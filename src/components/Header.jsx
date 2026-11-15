@@ -32,7 +32,18 @@ function Brand() {
   )
 }
 
-export default function Header({ step, sim, location, onGoHome, onAbout, onReset, inLab = false, onOpenLab }) {
+export default function Header({
+  step,
+  sim,
+  location,
+  onGoHome,
+  onAbout,
+  onReset,
+  inLab = false,
+  onOpenLab,
+  inMap = false,
+  onOpenMap,
+}) {
   const away = location && location.kind !== 'earth'
 
   return (
@@ -88,6 +99,14 @@ export default function Header({ step, sim, location, onGoHome, onAbout, onReset
               </div>
             </div>
           )}
+          <button
+            type="button"
+            className={`btn px-3 py-1.5 text-xs ${inMap ? 'btn-primary' : ''}`}
+            onClick={onOpenMap}
+            aria-pressed={inMap}
+          >
+            {inMap ? '← Mission' : 'Star map'}
+          </button>
           <button
             type="button"
             className={`btn px-3 py-1.5 text-xs ${inLab ? 'btn-primary' : ''}`}

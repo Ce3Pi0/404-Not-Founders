@@ -119,6 +119,7 @@ export default function DestinationPicker({
   onSelect,
   onContinue,
   onGoHome,
+  onOpenMap,
 }) {
   const departureSuggestions = useMemo(
     () => [EARTH, ...nearbyPlanets(EARTH, 6).filter((entry) => entry.id !== origin.id)],
@@ -190,6 +191,12 @@ export default function DestinationPicker({
           {formatNumber(distanceLy, distanceLy < 1 ? 5 : 2)} ly
         </div>
       </div>
+
+      {onOpenMap && (
+        <button type="button" className="btn w-full text-[12px]" onClick={onOpenMap}>
+          Open the 3D star map →
+        </button>
+      )}
 
       <div>
         <div className="mb-2 text-[9px] tracking-[0.16em] text-ink/50 uppercase">Recommended</div>

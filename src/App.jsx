@@ -7,6 +7,7 @@ import JourneyStage from './components/JourneyStage'
 import Debrief from './components/Debrief'
 import AboutDialog from './components/AboutDialog'
 import RelativityLab from './components/lab/RelativityLab'
+import StarMapView from './components/map/StarMapView'
 import { simulateMission } from './lib/physics'
 import { emptySimulation, loadSimulation, recordMission, saveSimulation } from './lib/simulation'
 import { DEFAULT_PLANET, EARTH, distanceLyBetween, nearbyPlanets } from './lib/catalog'
@@ -77,6 +78,23 @@ export default function App() {
     setStep('destination')
   }
 
+  // The 3D map edits the same origin/destination state as the picker.
+  const mapSetDestination = (next) => {
+    if (!next || next.id === location.id) return
+    setPlanet(next)
+    setStep('destination')
+  }
+
+  const mapSetOrigin = (next) => {
+    if (!next) return
+    setLocation(next)
+    if (next.id === planet.id) {
+      const replacement = nearbyPlanets(next, 6).find((entry) => entry.id !== next.id)
+      if (replacement) setPlanet(replacement)
+    }
+    setStep('destination')
+  }
+
   const reset = () => {
     if (sim.missions.length > 0 && !window.confirm('Reset the simulation and clear the mission log?')) {
       return
@@ -100,6 +118,8 @@ export default function App() {
         onReset={reset}
         inLab={step === 'lab'}
         onOpenLab={() => setStep(step === 'lab' ? 'destination' : 'lab')}
+        inMap={step === 'map'}
+        onOpenMap={() => setStep(step === 'map' ? 'destination' : 'map')}
       />
 
       <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-4 lg:px-8 lg:py-6">
@@ -121,8 +141,19 @@ export default function App() {
               onSelect={setPlanet}
               onContinue={() => setStep('flight')}
               onGoHome={goHome}
+              onOpenMap={() => setStep('map')}
             />
           </div>
+        )}
+
+        {step === 'map' && (
+          <StarMapView
+            origin={location}
+            planet={planet}
+            onSetDestination={mapSetDestination}
+            onSetOrigin={mapSetOrigin}
+            onExit={() => setStep('destination')}
+          />
         )}
 
         {step === 'flight' && (

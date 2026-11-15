@@ -27,6 +27,11 @@ Built by **404 Not Founders** for **Hack The Nest** — second playable draft.
   prediction accuracy, the destination's surface-gravity clock rate, and a persistent mission log.
 - **Age** — the crew, the Earth twin and the locals age through baby → toddler → child → teen →
   adult → elderly → skeleton as accumulated time crosses each threshold.
+- **3D star map** — every unique host-star system inside the nearest 150 light-years as a glowing
+  point in a real 3D volume: free orbit, zoom and pan, a labelled Solar System origin, projected
+  names for the selected and nearby systems, a live light-year scale bar, an orientation axis
+  indicator and a reset-camera control. Selecting a star opens its worlds and routes straight into
+  the existing departure/destination flow (`Star map` in the header, or from the route stage).
 - **Relativity Lab** — a flight console with four camera perspectives (first-, second- and
   third-person, plus a bird's-eye system map), a synchronized Point A / Point B split screen, live
   digital clocks, spacecraft and G-force telemetry, and full start / pause / resume / reset control
@@ -54,6 +59,27 @@ stellar mass from Kepler's third law (`M = a³/P²`), radius and luminosity from
 relations, equilibrium temperature from luminosity and orbital distance, and bulk properties from a
 deterministic per-planet estimate. The UI and About dialog label them as estimates. Colours are
 likewise inferred, not observed.
+
+## 3D universe map
+
+`src/components/map/` renders the archive as a navigable universe, one glowing point per unique
+host-star system. `catalog.js` keeps two coordinate sets per system:
+
+- `position` — the existing equatorial parsec vector `[d·cosδ·cosα, d·cosδ·sinα, d·sinδ]`, used by
+  every route and travel-time calculation.
+- `mapPosition` — the exact map-frame Cartesian coordinates in light-years for a right-handed,
+  Y-up frame with the Solar System at the origin: `x = d·cosδ·cosα`, `y = d·sinδ`,
+  `z = d·cosδ·sinα`, where `d` is `sy_dist` converted to light-years.
+
+`src/lib/starMap.js` adds `renderPosition` for the scene. The scale is linear — one world unit is one
+light-year — so no visual compression exists and drawn coordinates equal the physical ones. The two
+are kept separate so any future compression stays explicit, and every distance shown in the panel or
+used for routing is measured from `mapPosition`/`position`, never from what is drawn.
+
+The first version draws only systems within 150 ly. Systems whose archive row has no `sy_dist` are
+left out of the map (their `mapPosition` is `null`) but remain searchable and routable, and systems
+beyond the region are counted in the map overlay. Names are HTML labels projected from the 3D
+positions and capped at 12, because no 3D text library is installed.
 
 ## Theme
 
@@ -127,7 +153,9 @@ src/
   lib/labPhysics.js       relativistic helpers, clock formatting, planet frames
   lib/launchPhysics.js    launch integrator: thrust, fuel, phases, proper time, telemetry
   lib/labCatalog.js       lab stations (Earth + archive worlds) and route distances
+  lib/starMap.js          map-frame entries, 150 ly region, label selection, exact map distances
   components/             scene, crew figures, HUD, picker, flight plan, journey, debrief
+  components/map/         3D universe map: scene, labels, system panel, orientation gizmo
   components/lab/         launch console: scene + camera rigs, controls, config, telemetry, education
 ```
 
