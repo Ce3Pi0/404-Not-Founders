@@ -13,7 +13,7 @@ function formatAltitude(metres) {
 function DigitalClock({ years, tone = 'text-ink' }) {
   const clock = clockParts(years)
   return (
-    <div className="num flex flex-wrap items-baseline gap-x-1.5">
+    <div className="flex flex-wrap items-baseline gap-x-1.5">
       <span className={`text-[26px] leading-none font-semibold tabular-nums sm:text-[30px] ${tone}`}>
         {clock.years}
         <span className="ml-0.5 text-[11px] font-normal text-muted">y</span>
@@ -38,7 +38,7 @@ function ClockCard({ label, station, years, dot, ring, tone, sub }) {
       <div className="mt-2">
         <DigitalClock years={years} tone={tone} />
       </div>
-      <div className="num mt-2 text-[10px] text-muted">{sub}</div>
+      <div className="mt-2 text-[10px] text-muted">{sub}</div>
     </div>
   )
 }
@@ -47,8 +47,8 @@ function Metric({ label, value, sub, tone = 'text-ink' }) {
   return (
     <div className="rounded-lg border border-line/60 bg-void/40 px-3 py-2">
       <div className="text-[9px] tracking-[0.14em] text-muted uppercase">{label}</div>
-      <div className={`num mt-1 text-[15px] leading-tight font-semibold ${tone}`}>{value}</div>
-      {sub && <div className="num mt-0.5 text-[10px] text-muted">{sub}</div>}
+      <div className={`mt-1 text-[15px] leading-tight font-semibold ${tone}`}>{value}</div>
+      {sub && <div className="mt-0.5 text-[10px] text-muted">{sub}</div>}
     </div>
   )
 }
@@ -59,7 +59,7 @@ function Gauge({ label, value, display, max, tone = 'bg-ion' }) {
     <div>
       <div className="flex items-baseline justify-between">
         <span className="text-[10px] tracking-[0.12em] text-muted uppercase">{label}</span>
-        <span className="num text-[12px] text-ink">{display}</span>
+        <span className="text-[12px] text-ink">{display}</span>
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/8">
         <div className={`h-full rounded-full ${tone} transition-[width] duration-200`} style={{ width: `${pct}%` }} />
@@ -71,8 +71,8 @@ function Gauge({ label, value, display, max, tone = 'bg-ion' }) {
 function Equation({ children, value }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-line/50 bg-void/30 px-2.5 py-1.5">
-      <span className="num text-[10px] text-muted">{children}</span>
-      <span className="num text-[11px] text-ink">{value}</span>
+      <span className="text-[10px] text-muted">{children}</span>
+      <span className="text-[11px] text-ink">{value}</span>
     </div>
   )
 }
@@ -97,7 +97,7 @@ export default function LaunchTelemetry({ telemetry, route, config, shipName }) 
             <div className="label">Live clocks</div>
             <h2 className="mt-0.5 text-lg font-semibold tracking-tight">Three clocks, one flight</h2>
           </div>
-          <span className="num rounded-full border border-ion/40 bg-ion/10 px-2.5 py-1 text-[10px] tracking-[0.14em] text-ion uppercase">
+          <span className="rounded-full border border-ion/40 bg-ion/10 px-2.5 py-1 text-[10px] tracking-[0.14em] text-ion uppercase">
             {telemetry.stageLabel}
           </span>
         </div>
@@ -136,10 +136,10 @@ export default function LaunchTelemetry({ telemetry, route, config, shipName }) 
               <span className="h-1.5 w-1.5 rounded-full bg-solar" />
             </div>
             <div className="mt-1 text-[11px] text-ink/80">launch planet − ship</div>
-            <div className="num mt-2 text-[26px] leading-none font-semibold text-solar sm:text-[28px]">
+            <div className="mt-2 text-[26px] leading-none font-semibold text-solar sm:text-[28px]">
               {formatGap(telemetry.divergenceYears)}
             </div>
-            <div className="num mt-2 text-[10px] text-muted">
+            <div className="mt-2 text-[10px] text-muted">
               planet − destination {formatGap(telemetry.stationGapYears)}
             </div>
           </div>
@@ -176,7 +176,7 @@ export default function LaunchTelemetry({ telemetry, route, config, shipName }) 
         <section className="panel p-4 sm:p-5">
           <div className="flex items-center justify-between">
             <div className="label">Spacecraft telemetry</div>
-            <span className="num text-[10px] text-muted">{Math.round(telemetry.fraction * 100)}% of route</span>
+            <span className="text-[10px] text-muted">{Math.round(telemetry.fraction * 100)}% of route</span>
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <Metric

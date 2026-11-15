@@ -73,11 +73,10 @@ function CameraOption({ camera, active, disabled, onSelect }) {
         if (!disabled) onSelect(camera.id)
       }}
       title={camera.detail}
-      className={`group flex w-full items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition ${
-        active
+      className={`group flex w-full items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition ${active
           ? 'border-ion/60 bg-ion/[0.08] text-ink shadow-[0_0_30px_-16px_rgba(94,231,255,0.9)]'
           : 'border-line/70 bg-white/[0.015] text-muted hover:border-ion/35 hover:text-ink'
-      } ${disabled ? 'cursor-not-allowed opacity-45 hover:border-line/70' : ''}`}
+        } ${disabled ? 'cursor-not-allowed opacity-45 hover:border-line/70' : ''}`}
     >
       <span className={active ? 'shrink-0 text-ion' : 'shrink-0 text-muted/80 group-hover:text-ion/80'}>
         {camera.icon}
@@ -103,7 +102,7 @@ function SideSelect({ id, label, value, onChange }) {
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="num rounded-md border border-line bg-void/70 px-1.5 py-0.5 text-[10px] tracking-normal text-ink normal-case"
+        className="rounded-md border border-line bg-void/70 px-1.5 py-0.5 text-[10px] tracking-normal text-ink normal-case"
       >
         {CAMERA_VIEWS.map((camera) => (
           <option key={camera.id} value={camera.id}>
@@ -136,7 +135,7 @@ export default function CameraMenu({
           <div className="label">Camera</div>
           <h2 className="mt-0.5 text-[15px] font-semibold tracking-tight">Viewing perspective</h2>
         </div>
-        <span className="num rounded-full border border-line bg-white/[0.02] px-2.5 py-1 text-[10px] text-muted">
+        <span className="rounded-full border border-line bg-white/[0.02] px-2.5 py-1 text-[10px] text-muted">
           {split ? 'two live views' : 'one active'}
         </span>
       </div>
@@ -157,7 +156,7 @@ export default function CameraMenu({
         <div className="rounded-xl border border-line/70 bg-void/40 px-3 py-2.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] tracking-[0.14em] text-muted uppercase">Camera distance</span>
-            <span className="num text-[11px] text-ink">{chaseDistance.toFixed(1)}</span>
+            <span className="text-[11px] text-ink">{chaseDistance.toFixed(1)}</span>
           </div>
           <input
             type="range"
@@ -174,7 +173,7 @@ export default function CameraMenu({
         <div className="rounded-xl border border-line/70 bg-void/40 px-3 py-2.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] tracking-[0.14em] text-muted uppercase">Viewing angle</span>
-            <span className="num text-[11px] text-ink">{Math.round((cameraAngle * 180) / Math.PI)}°</span>
+            <span className="text-[11px] text-ink">{Math.round((cameraAngle * 180) / Math.PI)}°</span>
           </div>
           <input
             type="range"
@@ -209,14 +208,12 @@ export default function CameraMenu({
           aria-checked={split}
           aria-label="Split-screen A and B"
           onClick={() => onSplitChange(!split)}
-          className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition ${
-            split ? 'border-ion/70 bg-ion/25' : 'border-line bg-white/[0.05]'
-          }`}
+          className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition ${split ? 'border-ion/70 bg-ion/25' : 'border-line bg-white/[0.05]'
+            }`}
         >
           <span
-            className={`absolute h-4 w-4 rounded-full transition-all ${
-              split ? 'left-[24px] bg-ion shadow-[0_0_14px_rgba(94,231,255,0.9)]' : 'left-[3px] bg-muted/70'
-            }`}
+            className={`absolute h-4 w-4 rounded-full transition-all ${split ? 'left-[24px] bg-ion shadow-[0_0_14px_rgba(94,231,255,0.9)]' : 'left-[3px] bg-muted/70'
+              }`}
           />
         </button>
       </div>

@@ -6,7 +6,7 @@ export default function StageProgress({ stage, progress }) {
     <div className="rounded-xl border border-line/70 bg-void/40 px-3 py-2.5">
       <div className="flex items-center justify-between">
         <span className="text-[9px] tracking-[0.16em] text-muted uppercase">Launch sequence</span>
-        <span className="num text-[10px] text-ion">
+        <span className="text-[10px] text-ion">
           {stage + 1}/{LAUNCH_STAGES.length} · {Math.round(progress * 100)}%
         </span>
       </div>
@@ -22,14 +22,12 @@ export default function StageProgress({ stage, progress }) {
           return (
             <li
               key={item.id}
-              className={`flex items-center gap-1.5 text-[9px] tracking-[0.06em] uppercase ${
-                state === 'current' ? 'text-ion' : state === 'done' ? 'text-mint/80' : 'text-muted/50'
-              }`}
+              className={`flex items-center gap-1.5 text-[9px] tracking-[0.06em] uppercase ${state === 'current' ? 'text-ion' : state === 'done' ? 'text-mint/80' : 'text-muted/50'
+                }`}
             >
               <span
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                  state === 'current' ? 'bg-ion shadow-[0_0_8px_rgba(94,231,255,0.9)]' : state === 'done' ? 'bg-mint/70' : 'bg-white/15'
-                }`}
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${state === 'current' ? 'bg-ion shadow-[0_0_8px_rgba(94,231,255,0.9)]' : state === 'done' ? 'bg-mint/70' : 'bg-white/15'
+                  }`}
               />
               <span className="truncate">{item.label}</span>
             </li>

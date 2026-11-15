@@ -8,9 +8,9 @@ function Caption({ name, tone, described, note }) {
   return (
     <div className="rounded-lg border border-line/50 bg-void/50 px-2.5 py-2 text-center">
       <div className="truncate text-[11px] font-medium text-ink">{name}</div>
-      <div className="num mt-0.5 text-[10px] text-ink/85">{described.age.toFixed(1)} yr</div>
+      <div className="mt-0.5 text-[10px] text-ink/85">{described.age.toFixed(1)} yr</div>
       <div className="text-[10px] text-ink/55">{described.stage.label}</div>
-      <div className="num mt-0.5 text-[9px] text-ink/40">{note}</div>
+      <div className="mt-0.5 text-[9px] text-ink/40">{note}</div>
       <span className="sr-only">{tone}</span>
     </div>
   )

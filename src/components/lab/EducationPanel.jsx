@@ -9,7 +9,7 @@ function Item({ question, answer, equation, value }) {
     <div className="rounded-xl border border-line/70 bg-void/40 px-3.5 py-3">
       <h3 className="text-[12px] font-semibold tracking-tight text-ink">{question}</h3>
       <p className="mt-1 text-[11px] leading-relaxed text-muted">{answer}</p>
-      <div className="num mt-2 flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-line/50 bg-void/30 px-2.5 py-1.5">
+      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-line/50 bg-void/30 px-2.5 py-1.5">
         <span className="text-[10px] text-muted">{equation}</span>
         <span className="text-[11px] text-ion">{value}</span>
       </div>

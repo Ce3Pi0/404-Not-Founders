@@ -32,7 +32,7 @@ function formatThrust(newtons) {
 function Clock({ years, tone = 'text-ink', size = 'text-lg' }) {
   const parts = clockParts(years)
   return (
-    <span className={`num tabular-nums ${size} ${tone}`}>
+    <span className={`tabular-nums ${size} ${tone}`}>
       {parts.years}y {parts.days}d <span className="text-muted/90">{parts.hms}</span>
     </span>
   )
@@ -74,21 +74,21 @@ function CockpitOverlay({ telemetry }) {
       <div className="absolute inset-x-3 bottom-3 grid grid-cols-3 gap-2 rounded-xl border border-ion/25 bg-void/85 px-3 py-2 backdrop-blur">
         <div>
           <div className="text-[8px] tracking-[0.14em] text-muted uppercase">Velocity</div>
-          <div className="num text-[11px] text-ink">{formatPercentC(telemetry.percentC)} c</div>
+          <div className="text-[11px] text-ink">{formatPercentC(telemetry.percentC)} c</div>
           <div className="mt-1 h-1 rounded-full bg-white/10">
             <div className="h-full rounded-full bg-ion/80" style={{ width: `${speedPct}%` }} />
           </div>
         </div>
         <div>
           <div className="text-[8px] tracking-[0.14em] text-muted uppercase">G-force</div>
-          <div className="num text-[11px] text-solar">{telemetry.gForce.toFixed(2)} g</div>
+          <div className="text-[11px] text-solar">{telemetry.gForce.toFixed(2)} g</div>
           <div className="mt-1 h-1 rounded-full bg-white/10">
             <div className="h-full rounded-full bg-solar/80" style={{ width: `${gPct}%` }} />
           </div>
         </div>
         <div>
           <div className="text-[8px] tracking-[0.14em] text-muted uppercase">Fuel</div>
-          <div className="num text-[11px] text-mint">{Math.round(telemetry.fuelFraction * 100)}%</div>
+          <div className="text-[11px] text-mint">{Math.round(telemetry.fuelFraction * 100)}%</div>
           <div className="mt-1 h-1 rounded-full bg-white/10">
             <div className="h-full rounded-full bg-mint/80" style={{ width: `${telemetry.fuelFraction * 100}%` }} />
           </div>
@@ -104,17 +104,17 @@ function BirdOverlay({ telemetry, route }) {
       <div className="absolute top-1/2 left-3 -translate-y-1/2 rounded-lg border border-ion/30 bg-void/75 px-2.5 py-2 backdrop-blur">
         <div className="text-[8px] tracking-[0.16em] text-ion/80 uppercase">A · launch site</div>
         <div className="text-[11px] font-medium text-ink">{route.startPlanet?.name}</div>
-        <div className="num text-[9px] text-muted">{formatAltitude(telemetry.altitudeM)}</div>
+        <div className="text-[9px] text-muted">{formatAltitude(telemetry.altitudeM)}</div>
       </div>
       <div className="absolute top-1/2 right-3 -translate-y-1/2 rounded-lg border border-violet/30 bg-void/75 px-2.5 py-2 text-right backdrop-blur">
         <div className="text-[8px] tracking-[0.16em] text-violet/80 uppercase">B · destination</div>
         <div className="text-[11px] font-medium text-ink">{route.endPlanet?.name}</div>
-        <div className="num text-[9px] text-muted">{formatNumber(telemetry.remainingLy, 2)} ly to go</div>
+        <div className="text-[9px] text-muted">{formatNumber(telemetry.remainingLy, 2)} ly to go</div>
       </div>
       <div className="absolute inset-x-6 bottom-4">
         <div className="flex items-center justify-between text-[8px] tracking-[0.16em] text-muted uppercase">
           <span>launch</span>
-          <span className="num text-ion">{Math.round(telemetry.fraction * 100)}% of route</span>
+          <span className="text-ion">{Math.round(telemetry.fraction * 100)}% of route</span>
           <span>arrival</span>
         </div>
         <div className="relative mt-1.5 h-1 rounded-full bg-white/10">
@@ -133,27 +133,27 @@ function SplitPanel({ side, view, onViewChange, telemetry, route, playing, chase
   const isA = side === 'A'
   const data = isA
     ? {
-        title: 'Point A · departure',
-        station: route.startPlanet?.name ?? 'Launch planet',
-        frame: 'Rest frame of the launch planet',
-        clockYears: telemetry.aClockYears,
-        distanceLabel: 'Distance travelled',
-        distance: `${formatNumber(telemetry.travelledLy, 3)} ly`,
-        sub: formatAltitude(telemetry.altitudeM),
-        accent: 'border-ion/40 bg-ion/[0.07] text-ion',
-        dot: 'bg-ion',
-      }
+      title: 'Point A · departure',
+      station: route.startPlanet?.name ?? 'Launch planet',
+      frame: 'Rest frame of the launch planet',
+      clockYears: telemetry.aClockYears,
+      distanceLabel: 'Distance travelled',
+      distance: `${formatNumber(telemetry.travelledLy, 3)} ly`,
+      sub: formatAltitude(telemetry.altitudeM),
+      accent: 'border-ion/40 bg-ion/[0.07] text-ion',
+      dot: 'bg-ion',
+    }
     : {
-        title: 'Point B · approach',
-        station: route.endPlanet?.name ?? 'Destination',
-        frame: 'Rest frame of the destination',
-        clockYears: telemetry.bClockYears,
-        distanceLabel: 'Remaining distance',
-        distance: `${formatNumber(telemetry.remainingLy, 3)} ly`,
-        sub: formatDistanceKm(telemetry.remainingLy),
-        accent: 'border-violet/40 bg-violet/[0.07] text-violet',
-        dot: 'bg-violet',
-      }
+      title: 'Point B · approach',
+      station: route.endPlanet?.name ?? 'Destination',
+      frame: 'Rest frame of the destination',
+      clockYears: telemetry.bClockYears,
+      distanceLabel: 'Remaining distance',
+      distance: `${formatNumber(telemetry.remainingLy, 3)} ly`,
+      sub: formatDistanceKm(telemetry.remainingLy),
+      accent: 'border-violet/40 bg-violet/[0.07] text-violet',
+      dot: 'bg-violet',
+    }
 
   return (
     <div className="panel relative overflow-hidden">
@@ -179,7 +179,7 @@ function SplitPanel({ side, view, onViewChange, telemetry, route, playing, chase
               <span className="label text-[9px]">{data.title}</span>
             </div>
             <div className="mt-0.5 text-[15px] leading-tight font-semibold tracking-tight">{data.station}</div>
-            <div className="num mt-0.5 text-[9px] tracking-[0.08em] text-muted uppercase">{data.frame}</div>
+            <div className="mt-0.5 text-[9px] tracking-[0.08em] text-muted uppercase">{data.frame}</div>
           </div>
           <div className={`rounded-lg border px-2.5 py-1.5 text-right ${data.accent}`}>
             <div className="text-[8px] tracking-[0.14em] uppercase opacity-80">Local elapsed time</div>
@@ -196,7 +196,7 @@ function SplitPanel({ side, view, onViewChange, telemetry, route, playing, chase
               value={view}
               aria-label={`Camera for Point ${side}`}
               onChange={(event) => onViewChange(event.target.value)}
-              className="num rounded-md border border-line bg-void/80 px-1.5 py-0.5 text-[10px] text-ink"
+              className="rounded-md border border-line bg-void/80 px-1.5 py-0.5 text-[10px] text-ink"
             >
               {['first', 'second', 'third', 'bird'].map((id) => (
                 <option key={id} value={id}>
@@ -208,24 +208,24 @@ function SplitPanel({ side, view, onViewChange, telemetry, route, playing, chase
           <div className="pointer-events-none grid grid-cols-3 gap-2 rounded-xl border border-line/70 bg-void/80 px-3 py-2 backdrop-blur">
             <div>
               <div className="text-[8px] tracking-[0.14em] text-muted uppercase">Velocity</div>
-              <div className="num text-[11px] text-ink">{formatPercentC(telemetry.percentC)} c</div>
-              <div className="num text-[9px] text-muted">{formatNumber(telemetry.velocityMs, 0)} m/s</div>
+              <div className="text-[11px] text-ink">{formatPercentC(telemetry.percentC)} c</div>
+              <div className="text-[9px] text-muted">{formatNumber(telemetry.velocityMs, 0)} m/s</div>
             </div>
             <div>
               <div className="text-[8px] tracking-[0.14em] text-muted uppercase">{data.distanceLabel}</div>
-              <div className="num text-[11px] text-ink">{data.distance}</div>
-              <div className="num text-[9px] text-muted">{data.sub}</div>
+              <div className="text-[11px] text-ink">{data.distance}</div>
+              <div className="text-[9px] text-muted">{data.sub}</div>
             </div>
             <div className="text-right">
               <div className="text-[8px] tracking-[0.14em] text-muted uppercase">Ship clock</div>
-              <div className="num text-[11px] text-mint">{formatNumber(telemetry.shipClockYears, 3)} yr</div>
-              <div className="num text-[9px] text-muted">{formatNumber(telemetry.gamma, 3)}× γ</div>
+              <div className="text-[11px] text-mint">{formatNumber(telemetry.shipClockYears, 3)} yr</div>
+              <div className="text-[9px] text-muted">{formatNumber(telemetry.gamma, 3)}× γ</div>
             </div>
           </div>
         </div>
 
         <div className="pointer-events-none absolute inset-x-3 top-[70px] flex justify-center">
-          <span className="num rounded-full border border-line/70 bg-void/70 px-2 py-0.5 text-[9px] tracking-[0.12em] text-muted uppercase">
+          <span className="rounded-full border border-line/70 bg-void/70 px-2 py-0.5 text-[9px] tracking-[0.12em] text-muted uppercase">
             {telemetry.stageLabel}
           </span>
         </div>
@@ -297,7 +297,7 @@ export default function LaunchViewer({
             <span className="pulse-soft h-1.5 w-1.5 rounded-full bg-violet" />
             One simulation · two rest frames
           </span>
-          <span className="num text-[10px] text-muted">
+          <span className="text-[10px] text-muted">
             T = {formatNumber(telemetry.tYears, 4)} yr · τ<sub>ship</sub> ={' '}
             {formatNumber(telemetry.shipClockYears, 4)} yr · A−B {formatGap(telemetry.stationGapYears)}
           </span>
@@ -334,14 +334,14 @@ export default function LaunchViewer({
               <span className="rounded-full border border-line/70 bg-void/60 px-2 py-0.5 text-[9px] tracking-[0.1em] text-muted uppercase backdrop-blur">
                 {statusText}
               </span>
-              <span className="num rounded-full border border-ion/35 bg-ion/10 px-2 py-0.5 text-[9px] text-ion">
+              <span className="rounded-full border border-ion/35 bg-ion/10 px-2 py-0.5 text-[9px] text-ion">
                 {telemetry.stageLabel}
               </span>
             </div>
             <h2 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
               {shipName} <span className="text-muted/70">→</span> {route.endPlanet?.name}
             </h2>
-            <div className="num mt-0.5 text-[10px] text-muted">
+            <div className="mt-0.5 text-[10px] text-muted">
               {route.startPlanet?.name} · {VIEW_DETAIL[view]}
             </div>
           </div>
@@ -351,7 +351,7 @@ export default function LaunchViewer({
             <div className="mt-1">
               <Clock years={telemetry.shipClockYears} tone="text-mint" size="text-[15px]" />
             </div>
-            <div className="num mt-1 text-[9px] text-muted">
+            <div className="mt-1 text-[9px] text-muted">
               γ {formatNumber(telemetry.gamma, 3)} · β {telemetry.beta.toFixed(4)}
             </div>
           </div>
@@ -359,27 +359,27 @@ export default function LaunchViewer({
 
         <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-wrap items-end justify-between gap-2">
           <div className="flex flex-wrap gap-1.5">
-            <span className="num rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-ink backdrop-blur">
+            <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-ink backdrop-blur">
               {formatPercentC(telemetry.percentC)} c
             </span>
-            <span className="num rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
+            <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
               {formatNumber(telemetry.velocityMs, 0)} m/s
             </span>
-            <span className="num rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
+            <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
               {telemetry.gForce.toFixed(2)} g
             </span>
-            <span className="num rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
+            <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
               {formatAltitude(telemetry.altitudeM)}
               {telemetry.altitudeM < ATMOSPHERE_M ? ' · in atmosphere' : ' · above the atmosphere'}
             </span>
-            <span className="num rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
+            <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
               thrust {formatThrust(telemetry.thrustN)}
             </span>
           </div>
           <div className="min-w-[120px] flex-1 sm:max-w-[220px]">
             <div className="flex items-center justify-between text-[9px] tracking-[0.14em] text-muted uppercase">
               <span>mission</span>
-              <span className="num text-ion">{Math.round(telemetry.progress * 100)}%</span>
+              <span className="text-ion">{Math.round(telemetry.progress * 100)}%</span>
             </div>
             <div className="mt-1">
               <ProgressBar progress={telemetry.progress} />

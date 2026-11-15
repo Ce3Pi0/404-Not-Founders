@@ -53,7 +53,7 @@ function SummaryCell({ label, value }) {
   return (
     <div className="rounded-lg border border-line/60 bg-void/40 px-2.5 py-1.5">
       <div className="text-[8px] tracking-[0.14em] text-muted uppercase">{label}</div>
-      <div className="num mt-0.5 text-[11px] text-ink">{value}</div>
+      <div className="mt-0.5 text-[11px] text-ink">{value}</div>
     </div>
   )
 }

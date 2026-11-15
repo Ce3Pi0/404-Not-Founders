@@ -179,7 +179,7 @@ export default function RelativityLab({ onExit, shipName = 'Odyssey' }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="num flex items-center gap-2 rounded-lg border border-line/70 bg-white/[0.02] px-3 py-1.5 text-[11px]">
+          <div className="flex items-center gap-2 rounded-lg border border-line/70 bg-white/[0.02] px-3 py-1.5 text-[11px]">
             <span className="text-ink">{route.startPlanet.name}</span>
             <span className="text-ion">→</span>
             <span className="text-ink">{route.endPlanet.name}</span>
@@ -187,15 +187,14 @@ export default function RelativityLab({ onExit, shipName = 'Odyssey' }) {
             <span className="text-muted">{formatNumber(route.distanceLy, 2)} ly</span>
           </div>
           <span
-            className={`num rounded-full border px-2.5 py-1 text-[10px] tracking-[0.14em] uppercase ${
-              arrived
+            className={`rounded-full border px-2.5 py-1 text-[10px] tracking-[0.14em] uppercase ${arrived
                 ? 'border-mint/40 bg-mint/10 text-mint'
                 : playing
                   ? 'border-ion/40 bg-ion/10 text-ion'
                   : launch.phase === 'prelaunch'
                     ? 'border-line bg-white/[0.02] text-muted'
                     : 'border-solar/40 bg-solar/10 text-solar'
-            }`}
+              }`}
           >
             {telemetry.stageLabel}
           </span>

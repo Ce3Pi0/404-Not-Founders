@@ -22,7 +22,7 @@ export default function LaunchSlider({
             <span className="rounded-full border border-ion/40 px-1 text-[8px] tracking-[0.1em] text-ion">live</span>
           )}
         </span>
-        <span className="num text-[12px] font-semibold text-ink">{display}</span>
+        <span className="text-[12px] font-semibold text-ink">{display}</span>
       </div>
       <input
         type="range"

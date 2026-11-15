@@ -57,7 +57,7 @@ export default function LaunchControls({
           <div className="label">Mission control</div>
           <h2 className="mt-0.5 text-[15px] font-semibold tracking-tight">Launch console</h2>
         </div>
-        <span className={`num rounded-full border px-2.5 py-1 text-[10px] tracking-[0.14em] uppercase ${statusTone(state)}`}>
+        <span className={`rounded-full border px-2.5 py-1 text-[10px] tracking-[0.14em] uppercase ${statusTone(state)}`}>
           {statusText(state, playing)}
         </span>
       </div>
@@ -66,7 +66,7 @@ export default function LaunchControls({
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="text-[9px] tracking-[0.16em] text-muted uppercase">Ship proper clock</div>
-            <div className="num mt-1 text-[24px] leading-none font-semibold text-mint">
+            <div className="mt-1 text-[24px] leading-none font-semibold text-mint">
               {clock.years}y {clock.days}d
               <span className="ml-1.5 text-[13px] font-normal text-muted">{clock.hms}</span>
             </div>
@@ -78,7 +78,7 @@ export default function LaunchControls({
         </div>
 
         {state.phase === 'countdown' && (
-          <div className="num mt-2 text-center text-[34px] leading-none font-semibold text-solar">
+          <div className="mt-2 text-center text-[34px] leading-none font-semibold text-solar">
             T−{state.countdown.toFixed(1)} s
           </div>
         )}
@@ -89,7 +89,7 @@ export default function LaunchControls({
             style={{ width: `${Math.min(100, telemetry.progress * 100)}%` }}
           />
         </div>
-        <div className="num mt-1.5 flex justify-between text-[10px] text-muted">
+        <div className="mt-1.5 flex justify-between text-[10px] text-muted">
           <span>A {formatNumber(telemetry.aClockYears, 3)} yr</span>
           <span>{Math.round(telemetry.progress * 100)}%</span>
           <span>B {formatNumber(telemetry.bClockYears, 3)} yr</span>
@@ -129,7 +129,7 @@ export default function LaunchControls({
       <div>
         <div className="flex items-center justify-between">
           <span className="text-[10px] tracking-[0.14em] text-muted uppercase">Simulation speed</span>
-          <span className="num text-[10px] text-muted">
+          <span className="text-[10px] text-muted">
             {PLAYBACK_SPEEDS.find((preset) => preset.value === speed)?.blurb ?? 'custom'}
           </span>
         </div>
@@ -155,7 +155,7 @@ export default function LaunchControls({
         <div className="flex items-center justify-between gap-2">
           <div>
             <div className="text-[10px] tracking-[0.14em] text-muted uppercase">Engine</div>
-            <div className="num mt-0.5 text-[11px] text-ink">
+            <div className="mt-0.5 text-[11px] text-ink">
               {(telemetry.thrustN / 1e6).toFixed(2)} MN
               <span className="text-muted"> · {telemetry.accelerationMs.toFixed(1)} m/s²</span>
             </div>
@@ -167,14 +167,12 @@ export default function LaunchControls({
             aria-label="Engines active"
             onClick={() => onEnginesToggle(!state.engines)}
             disabled={!launched || state.phase === 'complete'}
-            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition disabled:opacity-40 ${
-              state.engines ? 'border-mint/70 bg-mint/25' : 'border-line bg-white/[0.05]'
-            }`}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition disabled:opacity-40 ${state.engines ? 'border-mint/70 bg-mint/25' : 'border-line bg-white/[0.05]'
+              }`}
           >
             <span
-              className={`absolute h-4 w-4 rounded-full transition-all ${
-                state.engines ? 'left-[24px] bg-mint shadow-[0_0_14px_rgba(92,225,166,0.9)]' : 'left-[3px] bg-muted/70'
-              }`}
+              className={`absolute h-4 w-4 rounded-full transition-all ${state.engines ? 'left-[24px] bg-mint shadow-[0_0_14px_rgba(92,225,166,0.9)]' : 'left-[3px] bg-muted/70'
+                }`}
             />
           </button>
         </div>
@@ -270,11 +268,11 @@ export default function LaunchControls({
       )}
 
       <div className="mt-auto grid grid-cols-2 gap-1.5 border-t border-line/70 pt-3 text-[10px]">
-        <div className="num flex items-center justify-between rounded-lg border border-line/60 bg-void/40 px-2.5 py-1.5">
+        <div className="flex items-center justify-between rounded-lg border border-line/60 bg-void/40 px-2.5 py-1.5">
           <span className="text-muted">A − ship</span>
           <span className="text-solar">{formatGap(telemetry.divergenceYears)}</span>
         </div>
-        <div className="num flex items-center justify-between rounded-lg border border-line/60 bg-void/40 px-2.5 py-1.5">
+        <div className="flex items-center justify-between rounded-lg border border-line/60 bg-void/40 px-2.5 py-1.5">
           <span className="text-muted">Peak G</span>
           <span className="text-ink">{telemetry.maxG.toFixed(2)} g</span>
         </div>
