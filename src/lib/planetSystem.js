@@ -2,9 +2,12 @@
 //
 // Scale discipline: the universe map (starMap.js) measures world units in
 // light-years. This module never reuses that scale — one scene unit is one AU,
-// and the archive's `pl_orbsmax` is drawn literally as the orbital radius. The
-// camera is framed to the system instead of the system being squeezed to fit a
-// shared galactic scale.
+// and the archive's `pl_orbsmax` is drawn literally as the orbital radius on
+// compact systems. A system spanning more than an order of magnitude (the Solar
+// System runs 0.39–30 AU) would collapse its inner worlds into the star, so
+// there the drawn radii are log-spaced instead; the reported AU values never
+// change. The camera is framed to the system instead of the system being
+// squeezed to fit a shared galactic scale.
 //
 // Honesty rules baked in here:
 //  · The extract has no `pl_rade`, so relative sizes come from the derived
@@ -24,7 +27,7 @@ const TAU = Math.PI * 2
 export const AU_PER_UNIT = 1
 
 export const SPEED_MIN_DAYS_PER_SECOND = 0.05
-export const SPEED_MAX_DAYS_PER_SECOND = 20
+export const SPEED_MAX_DAYS_PER_SECOND = 200
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
@@ -80,20 +83,35 @@ export function buildPlanetSystem(entry) {
   const reference = entry.planets[0] ?? placed[0]
   const starRadiusSun = reference?.starRadiusSun ?? 1
 
-  // Separation between neighbouring orbits. The Solar System spans 0.39 to 30 AU,
-  // so a size based on the outermost orbit alone would draw a Sun wider than
-  // Mercury's orbit — every drawn size below is capped by the room a body
-  // actually has, never by the system's overall extent.
-  const gapBefore = (index) =>
-    index === 0
-      ? (placed[0]?.semiMajorAxisAu ?? 0)
-      : placed[index].semiMajorAxisAu - placed[index - 1].semiMajorAxisAu
-  const gapAfter = (index) =>
-    index === placed.length - 1
-      ? (placed[index]?.semiMajorAxisAu ?? 0)
-      : placed[index + 1].semiMajorAxisAu - placed[index].semiMajorAxisAu
-  const spacingFor = (index) => Math.max(0, Math.min(gapBefore(index), gapAfter(index)))
+  // Real AU and drawn AU part company on wide systems. Drawn literally, the
+  // Solar System (0.39–30 AU) squeezes its rocky worlds into a few pixels
+  // around the star, so nothing looks like it is orbiting. Past this span the
+  // drawn radii are log-spaced between the innermost orbit and the extent: every
+  // orbit keeps a visible radius and motion the eye can follow. The archive's AU
+  // values are untouched — `orbitAu` and the inspector still report them.
+  const COMPRESSED_SPAN = 20
+  const INNER_FRACTION = 0.22
   const innermostAu = placed[0]?.semiMajorAxisAu ?? extentAu
+  const compressed =
+    placed.length > 1 && innermostAu > 0 && extentAu / innermostAu > COMPRESSED_SPAN
+  const drawnRadius = (au) => {
+    if (!compressed) return au
+    const t =
+      (Math.log(au) - Math.log(innermostAu)) / (Math.log(extentAu) - Math.log(innermostAu))
+    return extentAu * (INNER_FRACTION + (1 - INNER_FRACTION) * t)
+  }
+  const drawnRadii = placed.map((planet) => drawnRadius(planet.semiMajorAxisAu))
+
+  // Separation between neighbouring drawn orbits. A drawn size is capped by the
+  // room a body actually has, never by the system's overall extent.
+  const gapBefore = (index) =>
+    index === 0 ? (drawnRadii[0] ?? 0) : drawnRadii[index] - drawnRadii[index - 1]
+  const gapAfter = (index) =>
+    index === drawnRadii.length - 1
+      ? (drawnRadii[index] ?? 0)
+      : drawnRadii[index + 1] - drawnRadii[index]
+  const spacingFor = (index) => Math.max(0, Math.min(gapBefore(index), gapAfter(index)))
+  const innermostDrawn = drawnRadii[0] ?? extentAu
 
   const star = {
     name: entry.name,
@@ -107,7 +125,7 @@ export function buildPlanetSystem(entry) {
     // capped so it can never swallow the innermost orbit.
     units: Math.min(
       clamp(extentAu * 0.06 * Math.sqrt(starRadiusSun), extentAu * 0.03, extentAu * 0.1),
-      Math.max(extentAu * 0.002, innermostAu * 0.35),
+      Math.max(extentAu * 0.002, innermostDrawn * 0.35),
     ),
   }
 
@@ -122,7 +140,9 @@ export function buildPlanetSystem(entry) {
       planet,
       look: classifyPlanet(planet),
       orbitAu: planet.semiMajorAxisAu,
-      orbitUnits: planet.semiMajorAxisAu * AU_PER_UNIT,
+      // Drawn scene units: the archive's AU on compact systems, log-spaced on
+      // wide ones (see `compressed`).
+      orbitUnits: drawnRadii[index] * AU_PER_UNIT,
       radiusEarth,
       // Exaggerated draw radius (relative size follows √radius estimate), capped
       // by the gap to its neighbours so two orbits never touch on screen. Both
@@ -150,6 +170,7 @@ export function buildPlanetSystem(entry) {
     uncharted,
     placedCount: placed.length,
     extentAu,
+    compressed,
   }
 }
 

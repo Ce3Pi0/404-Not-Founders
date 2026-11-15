@@ -108,8 +108,10 @@ export default function SystemView({
           </h1>
           <p className="mt-1 text-[11px] text-ink/65">
             {formatNumber(entry.planets.length, 0)} known world
-            {entry.planets.length === 1 ? '' : 's'} · {system.placedCount} on the rings · local
-            scale in AU
+            {entry.planets.length === 1 ? '' : 's'} · {system.placedCount} on the rings ·{' '}
+            {system.compressed
+              ? 'orbit spacing compressed for display'
+              : 'local scale in AU'}
             {fromHere != null && fromHere > 0 && (
               <span className="text-ink/45"> · {formatNumber(fromHere, 2)} ly from {origin?.name}</span>
             )}
@@ -196,19 +198,30 @@ export default function SystemView({
 
             {/* local scale — the system scene measures AU, never light-years */}
             <div className="pointer-events-none absolute top-3 left-3 z-20 rounded-xl border border-line/45 bg-void/85 px-3 py-2 backdrop-blur">
-              <div className="flex items-center gap-2">
-                <div ref={scaleBarRef} className="h-px bg-white/70" style={{ width: 120 }} />
-                <span
-                  ref={scaleTextRef}
-                  data-testid="system-scale-readout"
-                  className="num text-[10px] text-ink/85"
-                >
-                  —
-                </span>
-              </div>
-              <div className="mt-1 text-[8px] tracking-[0.16em] text-ink/45 uppercase">
-                AU · linear · 1 unit = 1 AU
-              </div>
+              {system.compressed ? (
+                <>
+                  <div className="text-[10px] text-ink/85">Orbit spacing compressed</div>
+                  <div className="mt-1 text-[8px] tracking-[0.16em] text-ink/45 uppercase">
+                    real AU in the panel
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div ref={scaleBarRef} className="h-px bg-white/70" style={{ width: 120 }} />
+                    <span
+                      ref={scaleTextRef}
+                      data-testid="system-scale-readout"
+                      className="num text-[10px] text-ink/85"
+                    >
+                      —
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[8px] tracking-[0.16em] text-ink/45 uppercase">
+                    AU · linear · 1 unit = 1 AU
+                  </div>
+                </>
+              )}
             </div>
 
             {/* simulation time */}
