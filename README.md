@@ -22,12 +22,16 @@ Built by **404 Not Founders** for **Hack The Nest** — second playable draft.
   0.80 c), and the Lorentz factor, reference-frame time, ship time and aging difference updating as
   the slider moves. Change either endpoint, return to Earth, or launch.
 
-- **Fly** — a top-down route view: origin marker, dotted route, ship on the line with live speed,
-  distance travelled and remaining, two clocks advancing side by side, and the destination planet
-  growing as the ship closes in.
-- **Go home** — a go-home button (header, planet view and debrief) always returns you to Earth.
-- **Learn** — a debrief with elapsed time in both frames, the γ factor, the substitution behind it,
-  the destination's surface-gravity clock rate, and a persistent mission log.
+- **Fly** — a cinematic Live Flight scene on the real light-year route between the two systems:
+  a spacecraft travelling from departure to arrival on an accelerated timeline, three switchable
+  camera perspectives (external bird's-eye, departure observer with an optional delayed-signal
+  view, and the spacecraft cockpit), start / pause / resume / restart and playback controls, and a
+  relativity HUD whose reference and proper clocks both derive from the same progress value.
+  Arrival offers Explore This System, Choose Another Destination, or Return to Earth.
+- **Go home** — a go-home button (header, planet view and arrival panel) always returns you to
+  Earth.
+- **Learn** — Live Flight's relativity HUD and arrival summary show elapsed time in both frames,
+  the γ factor and their difference, and every completed trip joins the persistent mission log.
 - **Age** — the crew, the Earth twin and the locals age through baby → toddler → child → teen →
   adult → elderly → skeleton as accumulated time crosses each threshold.
 - **3D star map** — every unique host-star system inside the nearest 150 light-years as a glowing
@@ -121,11 +125,42 @@ speed control attached to it.
   destination.
 - **After arrival** the arrived system becomes the current location, so the next mission departs
   from it; **Return to Earth** plans the trip home from wherever the crew is.
-- **Launch Spacecraft** keeps the existing journey and debrief, and **Return to Star Map** goes back
-  to the 3D map.
+- **Launch Spacecraft** opens Live Flight on the calculated route, and **Return to Star Map** goes
+  back to the 3D map.
 - The model assumes a constant cruise speed, stationary endpoints in the chosen reference frame,
   negligible acceleration, and no gravitational clock corrections during transit. The screen says
   so; `/planet/:id` and the debrief carry the same note.
+
+## Live Flight
+
+`LiveFlight` (`src/components/travel/LiveFlight.jsx`, `flight/FlightScene.jsx`) replaces the old
+top-down journey with the animated interstellar run between the Travel Planner's two systems.
+
+- **Route** — the scene draws both host stars at their exact RA/Dec Cartesian positions in
+  light-years (one scene unit is one light-year) and flies the spacecraft along the straight
+  calculated path. Distances and the mission's reference-frame and proper durations come from the
+  mission snapshot taken at launch; nothing in the animation recomputes them.
+- **Timeline** — one `requestAnimationFrame` loop advances a single progress fraction from 0 to 1.
+  The whole trip takes 24 s at 1× playback; 0.5×, 1×, 2× and 4× only change how fast that fraction
+  moves. Both clocks are `progress × total duration`, so they agree at every instant:
+  `t_ref = p·d/β`, `t_ship = p·t_ref/γ`, `Δ = p·(t_ref − t_ship)`.
+- **Cameras** — *External* follows from outside with the route and both systems in frame;
+  *Departure Observer* watches from near the origin and offers a delayed-signal view; *Cockpit* is
+  a first-person forward view with an onboard clock and speed overlay. The selector switches
+  between them live.
+- **Delayed signal** — for the constant-speed outbound leg, light emitted at reference time `t_e`
+  from distance `β·t_e` reaches the origin at `t_e + β·t_e`. Setting that equal to the observer's
+  current time gives `t_e = t/(1+β)`, so the retarded marker sits at progress `p/(1+β)`. This is a
+  light-travel-time marker only: the MVP does not claim relativistic visual effects such as Doppler
+  colour, aberration, or acceleration.
+- **Controls** — Start, Pause, Resume, Restart, a playback selector, the camera selector and
+  **Back to Travel Planner**. Restart is disabled once the ship has arrived.
+- **Arrival** — a short transition, then the arrival panel marks the journey complete, logs it once,
+  makes the destination world the current location, and offers **Explore This System** (the host
+  system on the 3D map), **Choose Another Destination** (the route stage from the new location), or
+  **Return to Earth** (the Travel Planner with Earth as the destination — no teleporting).
+- **Model** — constant cruise speed for the whole leg, stationary endpoints, no acceleration or
+  braking, and no gravitational clock corrections in transit.
 
 ## Star System Explorer
 
@@ -221,10 +256,11 @@ planet, and keep changing the mission while it flies.
 
 ```
 src/
-  App.jsx                 mission state: route → travel planner → journey → debrief
+  App.jsx                 mission state: route → travel planner → live flight → arrival
   data/exoplanets.csv     NASA Exoplanet Archive extract (6,442 planets)
   lib/catalog.js          CSV parsing, systems, 3D positions, route distances, search
   lib/physics.js          time dilation, gravity, formatting
+  lib/flight.js           Live Flight progress clocks, playback rate, retarded-signal progress
   lib/planet.js           classification, palettes, procedural textures, star colour
   lib/aging.js            biological stages
   lib/simulation.js       localStorage mission log
@@ -236,7 +272,9 @@ src/
   lib/router.js           pathname routing for /system/:id, /planet/:id and /travel
   lib/glowTexture.js      shared star glow and halo sprites
   lib/webgl.js            one-time WebGL availability probe
-  components/             scene, crew figures, HUD, picker, travel planner, journey, debrief
+  components/             scene, crew figures, HUD, picker, travel planner, debrief
+  components/travel/      Travel Planner, system picker, Live Flight page and HUD
+  components/travel/flight/  Live Flight 3D scene and camera rigs
   components/map/         3D universe map and the AU-scale Star System Explorer scene
   components/PlanetDetailView.jsx  /planet/:id record page and its portrait
   components/lab/         launch console: scene + camera rigs, controls, config, telemetry, education

@@ -3,7 +3,7 @@ import Header from './components/Header'
 import DestinationPicker from './components/DestinationPicker'
 import PlanetStage from './components/PlanetStage'
 import TravelPlanner from './components/TravelPlanner'
-import JourneyStage from './components/JourneyStage'
+import LiveFlight from './components/travel/LiveFlight'
 import Debrief from './components/Debrief'
 import AboutDialog from './components/AboutDialog'
 import RelativityLab from './components/lab/RelativityLab'
@@ -36,6 +36,8 @@ export default function App() {
   const [mission, setMission] = useState(null)
   const [sim, setSim] = useState(loadSimulation)
   const [aboutOpen, setAboutOpen] = useState(false)
+  // A journey records its mission exactly once, when the ship actually arrives.
+  const recordedMission = useRef(null)
   // Selected star + camera framing survive a trip to /system/:id and back.
   const mapViewState = useRef({
     selected: null,
@@ -89,16 +91,53 @@ export default function App() {
       planetId: planet.id,
       shipName: shipName.trim() || 'Odyssey',
       distanceLy,
+      // Snapshot both ends so the flight scene keeps the exact systems the
+      // mission launched with, even after the arrival updates the current system.
+      originPlanet: location,
+      destinationPlanet: planet,
       startedAt: Date.now(),
     })
     goTo('journey')
   }
 
+  /** The ship reached its destination: log the trip once, then move the crew. */
   const arrive = () => {
-    if (!mission) return
+    if (!mission || recordedMission.current === mission.startedAt) return
+    recordedMission.current = mission.startedAt
     setSim((current) => recordMission(current, mission))
-    setLocation(planet)
-    goTo('debrief')
+    setLocation(mission.destinationPlanet ?? planet)
+  }
+
+  /** Live Flight → Travel Planner, abandoning the run in progress. */
+  const backToPlanner = () => {
+    setMission(null)
+    navigate(TRAVEL_PATH)
+    setStepState('flight')
+  }
+
+  /** Arrival: open the destination's host system on the 3D map. */
+  const exploreArrival = () => {
+    const arrival = mission?.destinationPlanet
+    if (!arrival) return
+    mapViewState.current.planetId = arrival.id
+    setPlanet(arrival)
+    setMission(null)
+    exploreSystem({ name: arrival.star })
+  }
+
+  /**
+   * Arrival: "Return to Earth" plans the trip home from the current system —
+   * the crew is never teleported between stars.
+   */
+  const returnToEarthFromFlight = () => {
+    const here = location
+    setMission(null)
+    if (here.kind === 'earth') {
+      goTo('destination')
+      return
+    }
+    setPlanet(EARTH)
+    goTo('flight')
   }
 
   const nextMission = () => {
@@ -305,13 +344,17 @@ export default function App() {
         )}
 
         {step === 'journey' && mission && (
-          <JourneyStage
+          <LiveFlight
             key={mission.startedAt}
-            origin={location}
-            planet={planet}
             mission={mission}
+            origin={mission.originPlanet ?? location}
+            destination={mission.destinationPlanet ?? planet}
             shipName={mission.shipName}
             onArrive={arrive}
+            onBack={backToPlanner}
+            onExplore={exploreArrival}
+            onChooseDestination={nextMission}
+            onReturnToEarth={returnToEarthFromFlight}
           />
         )}
 

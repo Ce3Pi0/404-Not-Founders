@@ -3,7 +3,7 @@ import { formatYears } from '../lib/physics'
 const STEPS = [
   { id: 'destination', label: 'Route' },
   { id: 'flight', label: 'Flight plan' },
-  { id: 'journey', label: 'Journey' },
+  { id: 'journey', label: 'Live flight' },
   { id: 'debrief', label: 'Debrief' },
 ]
 
