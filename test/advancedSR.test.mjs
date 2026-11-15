@@ -15,6 +15,7 @@ import {
   feasibilityFor,
   gammaFor,
   journeyEnergy,
+  recommendLaunch,
   resolveDepartureType,
   trajectoryAt,
 } from '../src/lib/advancedSR.js'
@@ -189,6 +190,34 @@ test('feasibility: the default 1 g set-point cannot lift off Earth', () => {
     earth,
   )
   assert.equal(orbital.ok, true)
+})
+
+test('recommendation makes an unflyable plan flyable in one step', () => {
+  const rec = recommendLaunch(DEFAULT_ADVANCED_CONFIG, earth)
+  assert.ok(rec)
+  // A surface launch has to out-accelerate Earth's 9.81 m/s², not match it.
+  assert.ok(rec.accelMs > 9.81)
+  const report = feasibilityFor({ ...DEFAULT_ADVANCED_CONFIG, ...rec }, earth)
+  assert.equal(report.ok, true)
+  assert.equal(report.departureType, 'surface')
+})
+
+test('recommendation keeps a workable set-point and only raises thrust', () => {
+  const rec = recommendLaunch({ ...DEFAULT_ADVANCED_CONFIG, departureType: 'orbital' }, earth)
+  assert.equal(rec.accelMs, 9.81)
+  assert.ok(rec.thrustMN >= 19.62)
+  assert.equal(
+    feasibilityFor({ ...DEFAULT_ADVANCED_CONFIG, departureType: 'orbital', ...rec }, earth).ok,
+    true,
+  )
+})
+
+test('recommendation declines when no allowed thrust can fly the craft', () => {
+  const rec = recommendLaunch(
+    { dryMassT: 20000, propellantT: 20000, thrustMN: 300, accelMs: 30, departureType: 'orbital' },
+    earth,
+  )
+  assert.equal(rec, null)
 })
 
 test('feasibility: unmeasured worlds depart from orbit by default', () => {

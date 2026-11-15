@@ -3,6 +3,7 @@ import {
   G0,
   LIMITS,
   defaultDepartureType,
+  recommendLaunch,
   resolveDepartureType,
   surfaceGravityMs2,
 } from '../../lib/advancedSR'
@@ -94,6 +95,8 @@ export default function AdvancedParameters({
   const gravity = surfaceGravityMs2(origin)
   const totalT = (Number(config.dryMassT) || 0) + (Number(config.propellantT) || 0)
   const blocked = feasibility && !feasibility.ok
+  // Never leave an unflyable plan without a way out: one click fixes it.
+  const recommendation = blocked ? recommendLaunch(config, origin) : null
 
   return (
     <div className="space-y-3">
@@ -309,6 +312,35 @@ export default function AdvancedParameters({
             This is a launch-configuration problem, not a resource-budget failure. The flight
             cannot start until it is corrected.
           </p>
+        </div>
+      )}
+
+      {recommendation && (
+        <div
+          className="rounded-xl border border-[#7cf0a8]/50 bg-[#7cf0a8]/10 px-3 py-2.5"
+          data-testid="recommended-launch"
+        >
+          <div className="text-[9px] font-semibold tracking-[0.14em] text-[#b8ffd4] uppercase">
+            Recommended launch settings
+          </div>
+          <p className="mt-0.5 text-[9.5px] leading-relaxed text-[#d9ffe8]">
+            {formatNumber(recommendation.accelMs, 1)} m/s² with{' '}
+            {formatNumber(recommendation.thrustMN, 1)} MN of thrust clears lift-off at{' '}
+            {formatNumber(feasibility.totalMassT, 0)} t and holds the set-point.
+          </p>
+          <button
+            type="button"
+            className="btn mt-1.5 px-2.5 py-1 text-[10px]"
+            data-testid="apply-recommended"
+            onClick={() =>
+              onChange({
+                accelMs: recommendation.accelMs,
+                thrustMN: recommendation.thrustMN,
+              })
+            }
+          >
+            Use these settings
+          </button>
         </div>
       )}
 

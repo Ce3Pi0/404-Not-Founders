@@ -347,3 +347,38 @@ export function feasibilityFor(config, planet) {
     issues,
   }
 }
+
+/**
+ * The smallest honest fix for a launch the current craft cannot fly, so an
+ * infeasible plan never leaves the player without a way forward.
+ *
+ * The requested acceleration is kept whenever only the engines are short. A
+ * surface launch must out-accelerate local gravity, so a set-point at or below
+ * it is lifted just clear of it. The engine is then sized to the acceleration
+ * at the craft's launch mass. Returns null when even the largest allowed
+ * thrust cannot fly the plan.
+ */
+export function recommendLaunch(config, planet) {
+  const settings = { ...config }
+  const departureType = resolveDepartureType(planet, settings.departureType)
+  const surface = departureType === 'surface'
+  const gravity = surface ? surfaceGravityMs2(planet) : null
+  const massT =
+    Math.max(0, Number(settings.dryMassT) || 0) + Math.max(0, Number(settings.propellantT) || 0)
+  if (!(massT > 0)) return null
+
+  const liftFloor =
+    surface && gravity != null ? Math.ceil((gravity + 0.5) * 10) / 10 : LIMITS.accelMs.min
+  const accelMs = clamp(
+    Math.max(Number(settings.accelMs) || 0, liftFloor),
+    LIMITS.accelMs.min,
+    LIMITS.accelMs.max,
+  )
+  const neededMN = (accelMs * massT * 1000) / 1e6
+  const thrustMN = Math.round((Math.ceil(neededMN / LIMITS.thrustMN.step) * LIMITS.thrustMN.step) * 10) / 10
+  const next = { ...settings, accelMs, thrustMN: Math.min(thrustMN, LIMITS.thrustMN.max) }
+
+  // A recommendation that still cannot fly is no recommendation at all.
+  if (!feasibilityFor(next, planet).ok) return null
+  return { accelMs: next.accelMs, thrustMN: next.thrustMN, departureType, surface }
+}

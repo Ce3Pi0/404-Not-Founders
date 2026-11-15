@@ -393,7 +393,7 @@ export default function TravelPlanner({
               data-testid="launch-blocked"
             >
               Launch held: this flight plan cannot lift off or reach the selected acceleration. Fix
-              the parameters below, then launch again.
+              the parameters below, or use the recommended launch settings, then launch again.
             </div>
           )}
 
