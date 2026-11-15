@@ -113,8 +113,8 @@ export default function ExpeditionHud({ expedition, summary }) {
         <div className="flex-1 rounded-xl border border-line/55 bg-void/88 px-3 py-2 backdrop-blur sm:mx-2 sm:max-w-[560px]">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <Stat
-              label="Velocity"
-              value={leg ? `${leg.beta.toFixed(3)} c` : '—'}
+              label={leg?.physicsMode === 'advanced' ? 'Peak velocity' : 'Velocity'}
+              value={leg ? `${(leg.betaPeak ?? leg.beta).toFixed(3)} c` : '—'}
               tone="accent"
             />
             <Stat label="Lorentz factor γ" value={leg ? leg.gamma.toFixed(4) : '—'} />

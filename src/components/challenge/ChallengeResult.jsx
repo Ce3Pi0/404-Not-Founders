@@ -87,6 +87,15 @@ export default function ChallengeResult() {
   const stats = (
     <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
       <Fact label="Planets surveyed" value={String(summary.surveyedCount)} tone="accent" />
+      <Fact
+        label="Physics mode"
+        value={route.physicsMode === 'advanced' ? 'Advanced SR' : 'Simple SR'}
+        note={
+          route.physicsMode === 'advanced'
+            ? `${formatNumber(route.advancedConfig?.accelMs ?? 0, 2)} m/s² proper accel.`
+            : 'constant cruise'
+        }
+      />
       <Fact label="Host systems" value={String(summary.systemsVisited)} />
       <Fact label="Distance flown" value={`${formatNumber(summary.distanceLy, 2)} ly`} />
       <Fact label="Earth elapsed" value={formatChallengeYears(summary.earthYears)} />

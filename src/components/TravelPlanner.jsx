@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
 import UniverseScene from './map/UniverseScene'
 import SystemPickerDialog from './travel/SystemPickerDialog'
+import AdvancedParameters from './travel/AdvancedParameters'
+import PhysicsAssumptions from './travel/PhysicsAssumptions'
 import { EARTH } from '../lib/catalog'
 import {
   PICK_TARGETS,
@@ -9,7 +11,9 @@ import {
   mapDistanceLy,
   travelSystemFor,
 } from '../lib/starMap'
-import { C_KM_S, formatNumber, formatYears, simulateMission } from '../lib/physics'
+import { C_KM_S, formatNumber, formatYears } from '../lib/physics'
+import { missionPhysics, planMission } from '../lib/mission'
+import { usePhysicsStore } from '../store/physicsStore'
 
 /** Direction the camera sits away from the route midpoint. */
 const VIEW_DIRECTION = (() => {
@@ -100,11 +104,33 @@ export default function TravelPlanner({
     [destinationEntry],
   )
 
-  const flight = simulateMission(distanceLy, beta)
+  const advanced = usePhysicsStore((state) => state.advanced)
+  const config = usePhysicsStore((state) => state.config)
+  const setAdvanced = usePhysicsStore((state) => state.setAdvanced)
+  const setConfig = usePhysicsStore((state) => state.setConfig)
+  const [blocked, setBlocked] = useState(false)
+
+  const plan = useMemo(
+    () => planMission({ origin, destination, distanceLy, beta, advanced, config }),
+    [origin, destination, distanceLy, beta, advanced, config],
+  )
+  const physics = missionPhysics(plan)
+  const flight = physics
   const canLaunch = Boolean(route) && distanceLy > 0 && !sameSystem
   const pct = ((beta - 0.1) / (0.99 - 0.1)) * 100
   const earthIsOrigin = origin?.id === EARTH.id
   const earthIsDestination = destination?.id === EARTH.id
+  const infeasible = advanced && plan.feasibility != null && !plan.feasibility.ok
+
+  /** Advanced flights only start when the craft can actually fly the plan. */
+  const handleLaunch = () => {
+    if (infeasible) {
+      setBlocked(true)
+      return
+    }
+    setBlocked(false)
+    onLaunch()
+  }
 
   const pickDestinationFromMap = (entry) => {
     if (!entry || entry.name === originEntry?.name) return
@@ -249,6 +275,35 @@ export default function TravelPlanner({
                   <dt className="text-ink/50">Aging Δ</dt>
                   <dd className="num text-right text-ink/85">{formatYears(flight.driftYears)}</dd>
                 </dl>
+                <div className="mt-1.5 border-t border-line/40 pt-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[8.5px] font-semibold tracking-[0.12em] text-ink/80 uppercase">
+                      Advanced acceleration
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={advanced}
+                      aria-label="Advanced acceleration"
+                      data-testid="advanced-acceleration-switch"
+                      onClick={() => setAdvanced(!advanced)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition ${
+                        advanced ? 'border-ion/70 bg-ion/40' : 'border-line/70 bg-panel/40'
+                      }`}
+                    >
+                      <span
+                        className={`absolute h-3.5 w-3.5 rounded-full transition-all ${
+                          advanced ? 'left-[19px] bg-ink' : 'left-[3px] bg-ink/60'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <div className="mt-0.5 text-[8px] leading-tight text-ink/40">
+                    {advanced
+                      ? 'Finite acceleration, cruise and braking'
+                      : 'Instantaneous acceleration and braking'}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -260,7 +315,7 @@ export default function TravelPlanner({
           <button
             type="button"
             className="btn btn-primary absolute right-3 bottom-3 z-20 px-4 py-2 text-[12px]"
-            onClick={onLaunch}
+            onClick={handleLaunch}
             disabled={!canLaunch}
             data-testid="launch-spacecraft"
           >
@@ -296,46 +351,109 @@ export default function TravelPlanner({
 
       <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="panel p-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <div className="text-[9px] tracking-[0.16em] text-ink/45 uppercase">
-              Predicted clocks · constant cruise
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[9px] tracking-[0.16em] text-ink/45 uppercase">
+                {advanced ? 'Advanced SR — acceleration + cruise + braking' : 'Simple SR — constant velocity'}
+              </div>
+              <p className="mt-0.5 max-w-lg text-[10px] leading-relaxed text-ink/55">
+                {advanced
+                  ? 'Calculate how much time and distance the spacecraft needs to accelerate to its selected speed and decelerate before arrival.'
+                  : 'The spacecraft reaches the chosen velocity instantly, travels at constant speed, and brakes instantly at its destination.'}
+              </p>
             </div>
-            <span className="num text-[10px] text-ink/55">
-              {formatNumber(beta * C_KM_S, 0)} km/s
-            </span>
+            <div className="flex items-center gap-2 rounded-xl border border-line/60 bg-void/50 px-3 py-1.5">
+              <span className="text-[9px] font-semibold tracking-[0.12em] text-ink/80 uppercase">
+                Advanced acceleration
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={advanced}
+                aria-label="Advanced acceleration"
+                data-testid="advanced-acceleration-switch-panel"
+                onClick={() => setAdvanced(!advanced)}
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition ${
+                  advanced ? 'border-ion/70 bg-ion/40' : 'border-line/70 bg-panel/40'
+                }`}
+              >
+                <span
+                  className={`absolute h-3.5 w-3.5 rounded-full transition-all ${
+                    advanced ? 'left-[19px] bg-ink' : 'left-[3px] bg-ink/60'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
 
-          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <Stat
-              label="Distance"
-              value={`${formatNumber(distanceLy, distanceLy < 1 ? 5 : 2)} ly`}
-              note="Euclidean · RA/Dec cartesian"
-            />
-            <Stat label="Cruise speed" value={`${beta.toFixed(3)} c`} note="0.10c–0.99c" />
-            <Stat label="Lorentz factor" value={flight.gamma.toFixed(3)} note="1 / √(1 − β²)" />
-            <Stat
-              label="Reference time"
-              value={formatYears(flight.earthYears)}
-              note="distance / β"
-            />
-            <Stat
-              label="Spacecraft time"
-              value={formatYears(flight.shipYears)}
-              note="reference / γ"
-            />
-            <Stat
-              label="Aging difference"
-              value={formatYears(flight.driftYears)}
-              note="reference − spacecraft"
-            />
-          </div>
+          {blocked && infeasible && (
+            <div
+              className="mt-2 rounded-xl border border-[#ff7a45]/60 bg-[#ff7a45]/10 px-3 py-2 text-[10px] leading-relaxed text-[#ffd8c9]"
+              role="status"
+              data-testid="launch-blocked"
+            >
+              Launch held: this flight plan cannot lift off or reach the selected acceleration. Fix
+              the parameters below, then launch again.
+            </div>
+          )}
 
-          <p className="mt-3 text-[10px] leading-relaxed text-ink/45">
-            Model assumptions: the craft cruises at a constant speed for the whole trip;
-            departure and destination are treated as stationary in the chosen reference frame;
-            acceleration and deceleration are negligible; and gravitational clock corrections
-            during transit are not included. Times are illustrative for the selected speed.
-          </p>
+          {!advanced ? (
+            <>
+              <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2">
+                <div className="text-[9px] tracking-[0.16em] text-ink/45 uppercase">
+                  Predicted clocks · constant cruise
+                </div>
+                <span className="num text-[10px] text-ink/55">
+                  {formatNumber(beta * C_KM_S, 0)} km/s
+                </span>
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <Stat
+                  label="Distance"
+                  value={`${formatNumber(distanceLy, distanceLy < 1 ? 5 : 2)} ly`}
+                  note="Euclidean · RA/Dec cartesian"
+                />
+                <Stat label="Cruise speed" value={`${beta.toFixed(3)} c`} note="0.10c–0.99c" />
+                <Stat
+                  label="Lorentz factor"
+                  value={flight.gamma.toFixed(3)}
+                  note="1 / √(1 − β²)"
+                />
+                <Stat
+                  label="Reference time"
+                  value={formatYears(flight.earthYears)}
+                  note="distance / β"
+                />
+                <Stat
+                  label="Spacecraft time"
+                  value={formatYears(flight.shipYears)}
+                  note="reference / γ"
+                />
+                <Stat
+                  label="Aging difference"
+                  value={formatYears(flight.driftYears)}
+                  note="reference − spacecraft"
+                />
+              </div>
+              <div className="mt-3">
+                <PhysicsAssumptions advanced={false} departureName={origin?.name} />
+              </div>
+            </>
+          ) : (
+            <div className="mt-3 space-y-3">
+              <AdvancedParameters
+                beta={beta}
+                onBetaChange={onBetaChange}
+                config={config}
+                onChange={setConfig}
+                plan={plan}
+                origin={origin}
+                distanceLy={distanceLy}
+              />
+              <PhysicsAssumptions advanced departureName={origin?.name} />
+            </div>
+          )}
         </div>
 
         <div className="panel flex flex-col gap-3 p-4">

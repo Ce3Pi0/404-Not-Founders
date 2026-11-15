@@ -37,6 +37,7 @@ export function recordMission(simulation, mission) {
         origin: mission.origin,
         planet: mission.planet,
         shipName: mission.shipName,
+        mode: mission.mode === 'advanced' ? 'advanced' : 'simple',
         beta: mission.beta,
         gamma: mission.gamma,
         distanceLy: mission.distanceLy,

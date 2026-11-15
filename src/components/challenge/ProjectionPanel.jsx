@@ -50,6 +50,40 @@ export default function ProjectionPanel({
         <div className="text-[12px] text-ink">Forecast for the whole expedition</div>
       </div>
 
+      <div className="rounded-xl border border-line/45 bg-void/50 px-3 py-2 text-[9.5px] leading-relaxed text-ink/55">
+        <div className="flex items-baseline justify-between gap-1">
+          <span className="text-[8px] tracking-[0.14em] text-ink/45 uppercase">Physics mode</span>
+          <span className="text-ink/85">
+            {route.physicsMode === 'advanced' ? 'ADVANCED SR' : 'SIMPLE SR'}
+          </span>
+        </div>
+        <p className="mt-1">
+          {route.physicsMode === 'advanced'
+            ? `Every leg accelerates, cruises when the distance allows and brakes at ${formatNumber(
+                route.advancedConfig?.accelMs ?? 0,
+                2,
+              )} m/s² proper acceleration. Times and burn energy use the speed each leg actually reaches.`
+            : 'Every leg cruises at its selected speed; acceleration and braking are instantaneous.'}
+        </p>
+        {route.physicsMode === 'advanced' && route.legs.length > 0 && (
+          <ul className="mt-1 space-y-0.5">
+            {route.legs.map((leg) => (
+              <li key={leg.key} className="flex justify-between gap-2">
+                <span className="truncate text-ink/45">
+                  {leg.fromSystem} → {leg.toSystem}
+                </span>
+                <span className="num shrink-0 text-ink/80">
+                  {(leg.betaPeak ?? leg.beta).toFixed(3)} c
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-1 text-[8.5px] text-ink/35">
+          Change the mode or parameters in Flight Plan; they apply here too.
+        </p>
+      </div>
+
       <div className="space-y-2 rounded-xl border border-line/45 bg-void/50 px-3 py-2.5">
         <Row label="Energy budget" value={`${formatEnergyUnits(energyBudget, 3)} mc²`} />
         <Row

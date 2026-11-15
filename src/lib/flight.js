@@ -8,6 +8,7 @@
 // in the mission stay exactly what the Travel Planner calculated.
 
 import { C_KM_S } from './physics'
+import { trajectoryAt } from './advancedSR'
 
 /** Seconds of playback for a whole trip at 1× speed. */
 export const FLIGHT_TIMELINE_SECONDS = 24
@@ -37,6 +38,60 @@ export function flightClock(mission, progress) {
     gamma: mission.gamma,
     kmS: mission.beta * C_KM_S,
   }
+}
+
+/**
+ * The clocks for the mission's own physics mode. Simple mode is the constant
+ * cruise above; advanced mode asks the trajectory, so the ship's velocity,
+ * Lorentz factor and proper time all change through acceleration and braking.
+ */
+export function missionClock(mission, progress) {
+  if (mission?.mode === 'advanced' && mission.advanced) {
+    const state = trajectoryAt(mission.advanced, progress)
+    if (!state) return flightClock(mission, progress)
+    return {
+      ...state,
+      driftYears: state.earthYears - state.shipYears,
+      kmS: state.beta * C_KM_S,
+    }
+  }
+  return flightClock(mission, progress)
+}
+
+/**
+ * Where the ship is on the route, and which earlier position the departure
+ * observer is seeing right now. Both come from the same trajectory.
+ */
+export function missionMotion(mission) {
+  const identity = (p) => p
+  if (mission?.mode !== 'advanced' || !mission.advanced) {
+    return {
+      positionAt: identity,
+      retardedAt: (p) => retardedProgress(p, mission?.beta ?? 0),
+    }
+  }
+  const model = mission.advanced
+  const positionAt = (p) => {
+    const state = trajectoryAt(model, p)
+    if (!state || !(model.distanceLy > 0)) return 0
+    return Math.min(1, Math.max(0, state.travelledLy / model.distanceLy))
+  }
+  const retardedAt = (p) => {
+    const progress = Math.min(1, Math.max(0, Number(p) || 0))
+    const now = trajectoryAt(model, progress)
+    if (!now || !(now.earthYears > 0)) return 0
+    // Light emitted at tₑ from x(tₑ) reaches the observer at tₑ + x(tₑ)/c.
+    let low = 0
+    let high = progress
+    for (let i = 0; i < 36; i += 1) {
+      const mid = (low + high) / 2
+      const state = trajectoryAt(model, mid)
+      if (state.earthYears + state.travelledLy < now.earthYears) low = mid
+      else high = mid
+    }
+    return (low + high) / 2
+  }
+  return { positionAt, retardedAt }
 }
 
 /**

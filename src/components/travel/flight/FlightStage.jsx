@@ -7,7 +7,6 @@ import { placeCamera } from './cameraMath'
 import { HAS_WEBGL, SIMPLIFIED_GRAPHICS } from '../../../lib/webgl'
 import { createGlowTexture } from '../../../lib/glowTexture'
 import { mulberry32 } from '../../../lib/planet'
-import { retardedProgress } from '../../../lib/flight'
 
 /* The four palette colours, plus white for star cores and readouts. */
 const VOID = '#160040'
@@ -142,7 +141,7 @@ function StarMarker({ position, span, glow, solar = false }) {
 
 /* ---------------------------------------------------------------- route ---- */
 
-function RouteLine({ route, progressRef }) {
+function RouteLine({ route, progressRef, positionAt }) {
   const geometry = useMemo(() => {
     const positions = new Float32Array((ROUTE_SEGMENTS + 1) * 3)
     for (let i = 0; i <= ROUTE_SEGMENTS; i += 1) {
@@ -164,7 +163,7 @@ function RouteLine({ route, progressRef }) {
 
   const painted = useRef(-1)
   useFrame(() => {
-    const progress = progressRef.current
+    const progress = positionAt(progressRef.current)
     if (painted.current >= 0 && Math.abs(progress - painted.current) < 0.0015) return
     painted.current = progress
     const colors = geometry.attributes.color.array
@@ -188,7 +187,7 @@ function RouteLine({ route, progressRef }) {
 
 /* ----------------------------------------------------------- spacecraft ---- */
 
-function FlightShip({ route, progressRef }) {
+function FlightShip({ route, progressRef, positionAt }) {
   const group = useRef()
   const quaternion = useMemo(
     () => new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), route.dir),
@@ -197,7 +196,8 @@ function FlightShip({ route, progressRef }) {
 
   useFrame(() => {
     if (!group.current) return
-    group.current.position.copy(route.from).addScaledVector(route.dir, route.span * progressRef.current)
+    const fraction = positionAt(progressRef.current)
+    group.current.position.copy(route.from).addScaledVector(route.dir, route.span * fraction)
   })
 
   return (
@@ -217,7 +217,7 @@ function FlightShip({ route, progressRef }) {
  * placed where the light arriving at the origin now was emitted. The parent's
  * renderer decides which panels draw it.
  */
-function DelayedGhost({ route, progressRef, beta, glow, groupRef }) {
+function DelayedGhost({ route, progressRef, retardedAt, glow, groupRef }) {
   const spriteRef = useRef()
   const scratch = useMemo(() => new THREE.Vector3(), [])
   const geometry = useMemo(
@@ -228,7 +228,7 @@ function DelayedGhost({ route, progressRef, beta, glow, groupRef }) {
   useEffect(() => () => geometry.dispose(), [geometry])
 
   useFrame(() => {
-    const progress = retardedProgress(progressRef.current, beta)
+    const progress = retardedAt(progressRef.current)
     scratch.copy(route.from).addScaledVector(route.dir, route.span * progress)
     if (spriteRef.current) spriteRef.current.position.copy(scratch)
     const position = geometry.attributes.position
@@ -265,7 +265,8 @@ function FlightWorld({
   route,
   glow,
   progressRef,
-  beta,
+  positionAt,
+  retardedAt,
   shipRef,
   ghostRef,
   solarOrigin,
@@ -280,17 +281,17 @@ function FlightWorld({
       />
 
       <StarField mid={route.mid} span={route.span} />
-      <RouteLine route={route} progressRef={progressRef} />
+      <RouteLine route={route} progressRef={progressRef} positionAt={positionAt} />
       <StarMarker position={route.from} span={route.span} glow={glow} solar={solarOrigin} />
       <StarMarker position={route.to} span={route.span} glow={glow} solar={solarDestination} />
 
       <group ref={shipRef}>
-        <FlightShip route={route} progressRef={progressRef} />
+        <FlightShip route={route} progressRef={progressRef} positionAt={positionAt} />
       </group>
       <DelayedGhost
         route={route}
         progressRef={progressRef}
-        beta={beta}
+        retardedAt={retardedAt}
         glow={glow}
         groupRef={ghostRef}
       />
@@ -312,6 +313,7 @@ function MultiViewRenderer({
   rectsRef,
   orbitRef,
   progressRef,
+  positionAt,
   shipRef,
   ghostRef,
   delayedRef,
@@ -345,7 +347,13 @@ function MultiViewRenderer({
       if (!camera || !rect || rect.width < 8 || rect.height < 8) return
 
       camera.aspect = rect.width / rect.height
-      placeCamera(camera, view.perspective, route, progressRef.current, orbitRef.current[view.perspective])
+      placeCamera(
+        camera,
+        view.perspective,
+        route,
+        positionAt(progressRef.current),
+        orbitRef.current[view.perspective],
+      )
 
       if (shipRef.current) shipRef.current.visible = view.perspective !== 'cockpit'
       if (ghostRef.current) {
@@ -378,7 +386,7 @@ export default function FlightStage({
   layout,
   origin,
   destination,
-  beta = 0.8,
+  motion,
   progressRef,
   delayed = false,
   clock,
@@ -387,6 +395,10 @@ export default function FlightStage({
 }) {
   const glow = useMemo(createGlowTexture, [])
   const route = useMemo(() => routeGeometry(origin, destination), [origin, destination])
+  // The ship follows the mission's own trajectory: linear progress in Simple SR,
+  // accelerate–cruise–brake in Advanced SR. Everything visual reads this.
+  const positionAt = motion?.positionAt ?? ((p) => p)
+  const retardedAt = motion?.retardedAt ?? ((p) => p)
 
   const orbitRef = useRef(null)
   if (!orbitRef.current) {
@@ -489,7 +501,8 @@ export default function FlightStage({
             route={route}
             glow={glow}
             progressRef={progressRef}
-            beta={beta}
+            positionAt={positionAt}
+            retardedAt={retardedAt}
             shipRef={shipRef}
             ghostRef={ghostRef}
             solarOrigin={origin?.name === 'Solar System'}
@@ -501,6 +514,7 @@ export default function FlightStage({
             rectsRef={rectsRef}
             orbitRef={orbitRef}
             progressRef={progressRef}
+            positionAt={positionAt}
             shipRef={shipRef}
             ghostRef={ghostRef}
             delayedRef={delayedRef}

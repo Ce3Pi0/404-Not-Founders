@@ -35,6 +35,61 @@ function ClockCard({ label, note, years, accent = false, tip, tipLabel }) {
   )
 }
 
+const PHASE_LABEL = {
+  acceleration: 'Acceleration',
+  cruise: 'Cruise',
+  braking: 'Braking',
+  arrived: 'Arrived',
+}
+
+function lyOf(value) {
+  return `${formatNumber(value, value !== 0 && Math.abs(value) < 1 ? 4 : 2)} ly`
+}
+
+/** Advanced-SR flight state: the phase, the burn geometry and the live speed. */
+function AdvancedPanel({ model, clock }) {
+  const brakeStartLy = Math.max(0, model.distanceLy - model.brakeDistanceLy)
+  return (
+    <div className="rounded-xl border border-ion/45 bg-ion/[0.08] px-2.5 py-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[8px] tracking-[0.14em] text-ink/45 uppercase">Flight phase</span>
+        <span className="num text-[11px] text-ink/90">
+          {PHASE_LABEL[clock.phase] ?? 'Cruise'}
+        </span>
+      </div>
+      <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[9px]">
+        <span className="text-ink/45">Current speed</span>
+        <span className="num text-right text-ink/85">{(clock.beta * 100).toFixed(1)}% c</span>
+        <span className="text-ink/45">Peak speed</span>
+        <span className="num text-right text-ink/85">{model.betaPeak.toFixed(3)} c</span>
+        <span className="text-ink/45">Acceleration distance</span>
+        <span className="num text-right text-ink/85">{lyOf(model.accelDistanceLy)}</span>
+        <span className="text-ink/45">Braking begins at</span>
+        <span className="num text-right text-ink/85">{lyOf(brakeStartLy)}</span>
+      </div>
+      <div className="relative mt-1.5 h-1.5 overflow-hidden rounded-full bg-panel/70">
+        <div
+          className="absolute inset-y-0 left-0 bg-ion/40"
+          style={{ width: `${model.accelFraction * 100}%` }}
+        />
+        <div
+          className="absolute inset-y-0 right-0 bg-white/25"
+          style={{ width: `${(1 - model.brakeStartFraction) * 100}%` }}
+        />
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-ion"
+          style={{ width: `${clock.progress * 100}%` }}
+        />
+      </div>
+      <div className="mt-0.5 flex justify-between text-[8px] text-ink/35">
+        <span>accelerate</span>
+        <span>cruise</span>
+        <span>brake</span>
+      </div>
+    </div>
+  )
+}
+
 function DelayedSignal({ enabled, onChange, delayYears, retardedPercent, shipName }) {
   return (
     <div className="rounded-xl border border-line/50 bg-void/50 px-2.5 py-2">
@@ -45,7 +100,9 @@ function DelayedSignal({ enabled, onChange, delayYears, retardedPercent, shipNam
             The timing is calculated, not illustrative. Light emitted at reference time{' '}
             <em>t_e</em> from distance <em>β·t_e</em> reaches the departure system at{' '}
             <em>t_e + β·t_e</em>; setting that equal to the observer's time gives{' '}
-            <em>t_e = t / (1 + β)</em>, so the marker sits at progress <em>p / (1 + β)</em>.
+            <em>t_e = t / (1 + β)</em>, so the marker sits at progress <em>p / (1 + β)</em> at
+            constant speed. With finite acceleration the same light-travel equation is solved
+            numerically on the flown trajectory.
           </InfoTip>
         </div>
         <button
@@ -202,6 +259,10 @@ export default function FlightHud({
         />
       </div>
 
+      {mission.mode === 'advanced' && mission.advanced && (
+        <AdvancedPanel model={mission.advanced} clock={clock} />
+      )}
+
       <div className="rounded-xl border border-line/55 bg-void/60 px-2.5 py-2">
         <div className="flex items-baseline justify-between gap-2">
           <div className="flex items-center gap-1">
@@ -254,10 +315,15 @@ export default function FlightHud({
       </div>
 
       <p className="text-[8px] leading-relaxed text-ink/35">
-        Both clocks use the same simulation progress and the mission's validated durations: reference{' '}
-        {formatYears(mission.earthYears)}, spacecraft {formatYears(mission.shipYears)} at{' '}
-        {mission.beta.toFixed(3)} c over {formatNumber(mission.distanceLy, 2)} ly. Playback speed only
-        changes the animation.
+        Both clocks read the same trajectory: reference {formatYears(mission.earthYears)},
+        spacecraft {formatYears(mission.shipYears)} over{' '}
+        {formatNumber(mission.distanceLy, 2)} ly.{' '}
+        {mission.mode === 'advanced'
+          ? `Proper time is integrated through acceleration, cruise and braking at ${mission.advanced.accelMs.toFixed(
+              2,
+            )} m/s² proper acceleration.`
+          : `Constant cruise at ${mission.beta.toFixed(3)} c; the proper-time integral is simply t/γ.`}{' '}
+        Playback speed only changes the animation.
       </p>
 
       {showDelayedSignal && (

@@ -39,8 +39,7 @@ export default function Header({
   onGoHome,
   onAbout,
   onReset,
-  inLab = false,
-  onOpenLab,
+  onSelectStep,
   inMap = false,
   onOpenMap,
 }) {
@@ -66,8 +65,9 @@ export default function Header({
             const active = entry.id === step
             const passed = STEPS.findIndex((s) => s.id === step) > index
             return (
-              <div
-                onClick={() => { }} // TODO: Set step
+              <button
+                type="button"
+                onClick={() => onSelectStep?.(entry.id)}
                 key={entry.id}
                 aria-current={active ? 'step' : undefined}
                 className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] tracking-[0.12em] uppercase transition hover:bg-ion/50 hover:cursor-pointer ${active ? 'bg-ion! text-white' : passed ? 'text-ink/70' : 'text-ink/40'
@@ -80,25 +80,23 @@ export default function Header({
                   {index + 1}
                 </span>
                 {entry.label}
-              </div>
+              </button>
             )
           })}
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          {!inLab && (
-            <div className="hidden items-center gap-3 rounded-lg border border-line/70 bg-white/[0.02] px-3 py-1.5 sm:flex">
-              <div>
-                <div className="text-[9px] tracking-[0.16em] text-muted uppercase">Earth</div>
-                <div className="num text-[11px] text-ink">{formatYears(sim.earthYears)}</div>
-              </div>
-              <div className="h-6 w-px bg-line" />
-              <div>
-                <div className="text-[9px] tracking-[0.16em] text-muted uppercase">Ship</div>
-                <div className="num text-[11px] text-ion">{formatYears(sim.shipYears)}</div>
-              </div>
+          <div className="hidden items-center gap-3 rounded-lg border border-line/70 bg-white/[0.02] px-3 py-1.5 sm:flex">
+            <div>
+              <div className="text-[9px] tracking-[0.16em] text-muted uppercase">Earth</div>
+              <div className="num text-[11px] text-ink">{formatYears(sim.earthYears)}</div>
             </div>
-          )}
+            <div className="h-6 w-px bg-line" />
+            <div>
+              <div className="text-[9px] tracking-[0.16em] text-muted uppercase">Ship</div>
+              <div className="num text-[11px] text-ion">{formatYears(sim.shipYears)}</div>
+            </div>
+          </div>
           <button
             type="button"
             className={`btn px-3 py-1.5 text-xs ${inMap ? 'btn-primary' : ''}`}
@@ -106,14 +104,6 @@ export default function Header({
             aria-pressed={inMap}
           >
             {inMap ? '← Mission' : 'Star map'}
-          </button>
-          <button
-            type="button"
-            className={`btn px-3 py-1.5 text-xs ${inLab ? 'btn-primary' : ''}`}
-            onClick={onOpenLab}
-            aria-pressed={inLab}
-          >
-            {inLab ? '← Mission' : 'Relativity Lab'}
           </button>
           <button type="button" className="btn px-3 py-1.5 text-xs" onClick={onAbout}>
             About

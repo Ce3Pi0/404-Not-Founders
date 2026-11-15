@@ -5,7 +5,7 @@ import {
   distanceLyBetween,
   nearbyPlanets,
 } from "../lib/catalog";
-import { simulateMission } from "../lib/physics";
+import { missionPhysics, planMission, readPhysicsConfig } from "../lib/mission";
 import {
   emptySimulation,
   loadSimulation,
@@ -22,7 +22,7 @@ export const STEPS = [
 ];
 
 const EMPTY_PREDICTION = { earth: "", ship: "" };
-const VALID_STEPS = new Set([...STEPS.map((step) => step.id), "lab"]);
+const VALID_STEPS = new Set(STEPS.map((step) => step.id));
 const GATED = new Set(["journey", "debrief"]);
 
 /**
@@ -63,13 +63,6 @@ export const useAppStore = create((set, get) => ({
       return get().arrive();
     set({ step: target });
   },
-  toggleLab() {
-    set((state) => ({ step: state.step === "lab" ? "destination" : "lab" }));
-  },
-  exitLab() {
-    set({ step: "destination" });
-  },
-
   /* ------------------------------ route ------------------------------ */
   selectOrigin(next) {
     if (!next || next.id === get().location.id) return;
@@ -95,10 +88,20 @@ export const useAppStore = create((set, get) => ({
   launch() {
     const { location, planet, beta, shipName } = get();
     const distanceLy = distanceLyBetween(location, planet);
-    const result = simulateMission(distanceLy, beta);
+    const { advanced, config } = readPhysicsConfig();
+    const plan = planMission({
+      origin: location,
+      destination: planet,
+      distanceLy,
+      beta,
+      advanced,
+      config,
+    });
+    if (plan.mode === "advanced" && plan.feasibility && !plan.feasibility.ok)
+      return;
     set({
       mission: {
-        ...result,
+        ...missionPhysics(plan),
         origin: location.name,
         originId: location.id,
         planet: planet.name,

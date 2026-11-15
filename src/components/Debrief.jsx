@@ -6,6 +6,8 @@ import {
   surfaceGravity,
 } from '../lib/physics'
 import { classifyPlanet } from '../lib/planet'
+import { usePhysicsStore } from '../store/physicsStore'
+import PhysicsAssumptions from './travel/PhysicsAssumptions'
 import CrewLineup from './CrewLineup'
 
 function Stat({ label, value, sub, tone = 'text-ink' }) {
@@ -15,6 +17,122 @@ function Stat({ label, value, sub, tone = 'text-ink' }) {
       <div className={`mt-1 text-2xl leading-none font-semibold sm:text-[26px] ${tone}`}>{value}</div>
       <div className="mt-1.5 text-[10px] text-muted">{sub}</div>
     </div>
+  )
+}
+
+const ly = (value) => `${formatNumber(value, Math.abs(value) < 1 ? 4 : 2)} ly`
+
+function Row({ label, value, note }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 border-b border-line/30 py-1 last:border-0">
+      <span className="text-[10px] text-muted">{label}</span>
+      <span className="num text-right text-[11px] text-ink">
+        {value}
+        {note && <span className="ml-1 text-[9px] text-muted">{note}</span>}
+      </span>
+    </div>
+  )
+}
+
+/** Advanced SR: what actually happened on each leg, from the flown model. */
+function AdvancedBreakdown({ mission }) {
+  const model = mission.advanced
+  if (!model) return null
+  return (
+    <section className="panel p-5">
+      <div className="label">Advanced SR — acceleration + cruise + braking</div>
+      <h2 className="mt-1 text-lg font-semibold tracking-tight">The journey stage by stage</h2>
+      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+        <div>
+          <div className="text-[9px] tracking-[0.14em] text-ink/45 uppercase">Speed</div>
+          <Row label="Requested cruise speed" value={`${model.requestedBeta.toFixed(3)} c`} />
+          <Row label="Actual peak velocity" value={`${model.betaPeak.toFixed(3)} c`} />
+          <Row label="Peak Lorentz factor" value={model.gammaPeak.toFixed(4)} />
+          <Row label="Proper acceleration" value={`${model.accelMs.toFixed(2)} m/s²`} />
+          {mission.departureType && (
+            <Row
+              label="Departure"
+              value={mission.departureType === 'surface' ? 'Planetary surface' : 'Orbital'}
+            />
+          )}
+          {mission.feasibility?.gravityMs2 != null && mission.feasibility.surface && (
+            <Row
+              label="Local surface gravity"
+              value={`${mission.feasibility.gravityMs2.toFixed(2)} m/s²`}
+            />
+          )}
+          <Row
+            label="Launch feasibility"
+            value={mission.feasibility?.ok ? 'passed' : 'not applicable'}
+          />
+        </div>
+        <div>
+          <div className="text-[9px] tracking-[0.14em] text-ink/45 uppercase">Burns</div>
+          <Row
+            label="Acceleration"
+            value={formatYears(model.accelYears)}
+            note={`· ${ly(model.accelDistanceLy)}`}
+          />
+          <Row
+            label="Cruise"
+            value={formatYears(model.cruiseYears)}
+            note={`· ${ly(model.cruiseDistanceLy)}`}
+          />
+          <Row
+            label="Braking"
+            value={formatYears(model.brakeYears)}
+            note={`· ${ly(model.brakeDistanceLy)}`}
+          />
+          <Row label="Total Earth-reference time" value={formatYears(model.earthYears)} />
+          <Row label="Total spacecraft proper time" value={formatYears(model.shipYears)} />
+          <Row label="Aging difference" value={formatYears(model.driftYears)} />
+        </div>
+      </div>
+      {!model.reachedTarget && (
+        <p className="mt-3 text-[10px] leading-relaxed text-ink/50">
+          The target cruise speed was not reachable over {formatNumber(mission.distanceLy, 2)} ly:
+          the ship accelerated to {model.betaPeak.toFixed(3)} c and braked immediately, with no cruise
+          phase. This is a valid trajectory, not a failed mission.
+        </p>
+      )}
+    </section>
+  )
+}
+
+/** Completed simple-vs-advanced results for this same route. */
+function ModeComparison({ mission }) {
+  const saved = usePhysicsStore(
+    (state) => state.results[`${mission.origin}→${mission.planet}`] ?? null,
+  )
+  if (!saved?.simple || !saved?.advanced) return null
+  const { simple, advanced } = saved
+  return (
+    <section className="panel p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="label">Mode comparison — same route</div>
+        <span className="text-[9px] text-ink/40">
+          {simple.shipName} · {formatNumber(simple.distanceLy, 2)} ly
+        </span>
+      </div>
+      <div className="mt-2 grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 text-[10px]">
+        <span className="text-ink/40">Flew with</span>
+        <span className="text-right text-ink/40">Simple SR</span>
+        <span className="text-right text-ink/40">Advanced SR</span>
+        <span className="text-ink/60">Earth time</span>
+        <span className="num text-right text-ink">{formatYears(simple.earthYears)}</span>
+        <span className="num text-right text-ink">{formatYears(advanced.earthYears)}</span>
+        <span className="text-ink/60">Ship time</span>
+        <span className="num text-right text-ink">{formatYears(simple.shipYears)}</span>
+        <span className="num text-right text-ink">{formatYears(advanced.shipYears)}</span>
+        <span className="text-ink/60">Peak speed</span>
+        <span className="num text-right text-ink/80">{simple.beta.toFixed(3)} c</span>
+        <span className="num text-right text-ink/80">{advanced.beta.toFixed(3)} c</span>
+      </div>
+      <p className="mt-2 text-[9px] leading-relaxed text-ink/40">
+        Same route, two physics models. Advanced SR spends real time and distance accelerating and
+        braking, so it can produce different elapsed times on both clocks.
+      </p>
+    </section>
   )
 }
 
@@ -37,13 +155,23 @@ function PhysicsCard({ mission, planet }) {
         <div>
           <span className="text-muted">γ = 1/√(1−β²)</span> = {mission.gamma.toFixed(4)}
         </div>
+        {mission.mode === 'advanced' ? (
+          <div>
+            <span className="text-muted">t⊕ = t_acc + t_cruise + t_brake</span> ={' '}
+            {formatNumber(mission.earthYears, 3)} yr
+          </div>
+        ) : (
+          <div>
+            <span className="text-muted">t⊕ = d/(βc)</span> ={' '}
+            {formatNumber(mission.distanceLy, 2)} ly ÷ {mission.beta.toFixed(3)} ={' '}
+            {formatNumber(mission.earthYears, 3)} yr
+          </div>
+        )}
         <div>
-          <span className="text-muted">t⊕ = d/(βc)</span> = {formatNumber(mission.distanceLy, 2)} ly ÷{' '}
-          {mission.beta.toFixed(3)} = {formatNumber(mission.earthYears, 3)} yr
-        </div>
-        <div>
-          <span className="text-muted">t_ship = t⊕/γ</span> ={' '}
-          <span className="text-ink">{formatNumber(mission.shipYears, 3)} yr</span>
+          <span className="text-muted">
+            {mission.mode === 'advanced' ? 't_ship = ∫ dt/γ(t)' : 't_ship = t⊕/γ'}
+          </span>{' '}
+          = <span className="text-ink">{formatNumber(mission.shipYears, 3)} yr</span>
         </div>
         <div>
           <span className="text-muted">Δ</span> = {formatNumber(mission.driftYears, 3)} yr of separation
@@ -63,8 +191,9 @@ function PhysicsCard({ mission, planet }) {
           crew ages.
         </p>
         <p>
-          This draft models a one-way cruise at constant velocity. Adding acceleration and braking
-          would keep the same physics, with a slightly different proper-time integral.
+          {mission.mode === 'advanced'
+            ? `This leg used finite acceleration and braking at ${mission.advanced.accelMs.toFixed(2)} m/s² of proper acceleration. The crew's proper time is the integral of √(1 − v(t)²/c²) over the whole voyage, so it cannot be recovered by applying one cruise γ to the trip.`
+            : 'This leg is a one-way cruise at constant velocity: acceleration at departure and braking at arrival both have zero simulated duration.'}
         </p>
       </div>
 
@@ -84,7 +213,8 @@ function PhysicsCard({ mission, planet }) {
               <span className="text-ink">{tinyPercent(1 - clockRate)}</span> slower than one in deep
               space (<span className="num">√(1 − rₛ/R) = {clockRate.toFixed(9)}</span>). Real, but
               vanishingly small next to the ship's {tinyPercent(1 - 1 / mission.gamma)} velocity
-              effect.
+              effect. This is context only: the journey's clocks include no gravitational
+              correction, in either physics mode.
             </>
           ) : (
             <>This world's mass and radius are incomplete in the archive, so its surface clock rate
@@ -126,6 +256,7 @@ function MissionLog({ sim, planet, onNext, onReset, onGoHome }) {
                 </div>
                 <div className="text-[10px] text-muted">
                   {entry.beta.toFixed(3)} c · {formatNumber(entry.distanceLy, 2)} ly
+                  {entry.mode === 'advanced' ? ' · advanced SR' : ' · simple SR'}
                 </div>
               </div>
               <div className="shrink-0 text-right text-[10px]">
@@ -177,11 +308,22 @@ export default function Debrief({ mission, planet, origin, sim, onNext, onReset,
           </h1>
           <p className="mt-1 text-[13px] text-ink/65">
             {mission.origin} <span className="text-ink/45">→</span> {planet.name} ·{' '}
-            {formatNumber(mission.distanceLy, 2)} ly · {mission.shipName} at {mission.beta.toFixed(3)} c
+            {formatNumber(mission.distanceLy, 2)} ly · {mission.shipName}{' '}
+            {mission.mode === 'advanced'
+              ? `peaked at ${mission.beta.toFixed(3)} c`
+              : `at ${mission.beta.toFixed(3)} c`}
           </p>
+          <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-ion/50 bg-ion/15 px-2.5 py-1 text-[9px] tracking-[0.14em] text-ink/85 uppercase">
+            <span className="h-1.5 w-1.5 rounded-full bg-ion" />
+            {mission.mode === 'advanced'
+              ? 'Advanced SR — finite acceleration'
+              : 'Simple SR — constant velocity'}
+          </div>
         </div>
         <div className="rounded-xl border border-line/60 bg-panel/40 px-3 py-2 text-right">
-          <div className="text-[9px] tracking-[0.16em] text-ink/60 uppercase">Time dilation</div>
+          <div className="text-[9px] tracking-[0.16em] text-ink/60 uppercase">
+            {mission.mode === 'advanced' ? 'Peak dilation' : 'Time dilation'}
+          </div>
           <div className="text-lg font-semibold text-ink">{ratio.toFixed(2)}×</div>
         </div>
       </div>
@@ -206,12 +348,16 @@ export default function Debrief({ mission, planet, origin, sim, onNext, onReset,
         />
       </div>
 
+      {mission.mode === 'advanced' && <AdvancedBreakdown mission={mission} />}
+      <ModeComparison mission={mission} />
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-4">
           <CrewLineup planet={planet} sim={sim} shipName={mission.shipName} />
         </div>
         <div className="min-w-0 space-y-4">
           <PhysicsCard mission={mission} planet={planet} />
+          <PhysicsAssumptions advanced={mission.mode === 'advanced'} departureName={mission.origin} />
           <MissionLog sim={sim} planet={planet} onNext={onNext} onReset={onReset} onGoHome={onGoHome} />
         </div>
       </div>

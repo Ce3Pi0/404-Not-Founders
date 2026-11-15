@@ -66,7 +66,7 @@ export function routeTarget(planet) {
  * A structurally valid route is one with at least one exoplanet; budgets never
  * affect validity — the planner may only warn.
  */
-export function buildExpeditionRoute(planetIds = [], legSpeeds = {}) {
+export function buildExpeditionRoute(planetIds = [], legSpeeds = {}, options = {}) {
   const seen = new Set()
   const targets = []
   const skipped = []
@@ -84,7 +84,7 @@ export function buildExpeditionRoute(planetIds = [], legSpeeds = {}) {
   }
 
   const stops = groupStops(targets)
-  const route = assembleExpedition(stops, legSpeeds)
+  const route = assembleExpedition(stops, legSpeeds, options)
   return {
     ...route,
     skipped,
@@ -94,7 +94,7 @@ export function buildExpeditionRoute(planetIds = [], legSpeeds = {}) {
 }
 
 /** One direct leg home from the current system, for ending the route early. */
-export function buildDirectReturnLeg({ fromSystem, departurePlanetId, index, beta, key }) {
+export function buildDirectReturnLeg({ fromSystem, departurePlanetId, index, beta, key, options }) {
   const position = hostPosition(fromSystem)
   const planet = planetById(departurePlanetId)
   if (!position || !planet || planet.kind === 'earth') return null
@@ -105,6 +105,7 @@ export function buildDirectReturnLeg({ fromSystem, departurePlanetId, index, bet
     index,
     beta,
     key: key ?? legKey(index, fromSystem, EARTH_SYSTEM),
+    options,
   })
 }
 
