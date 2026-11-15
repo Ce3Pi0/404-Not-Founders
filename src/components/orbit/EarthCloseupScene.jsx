@@ -7,33 +7,26 @@ import { mulberry32, starColor } from '../../lib/planet'
 import { thinSkyStars } from '../../lib/skyStars'
 import { createZoomOutLatch, wheelPixels } from '../../lib/zoomTransition'
 import { createGlowTexture } from '../../lib/glowTexture'
-import { createSunSurfaceTexture } from '../../lib/sunSurface'
 import { HAS_WEBGL } from '../../lib/webgl'
 import EarthSphere from '../EarthSphere'
 
 /**
- * The opening scene: Earth, close up and filling the frame, with the rest of the
- * Solar System in the sky behind it.
+ * The opening scene: Earth, close up and filling the frame.
  *
- * Scale note — one scene unit is one Earth radius (6,371 km). The Sun and the
- * neighbouring worlds behind it are drawn far smaller than their true angular
- * size would be at that range; this is a composition, not an ephemeris. The
- * headline Earth is the real thing: NASA's Blue Marble day colour, relief,
- * ocean gloss and cloud shell, so the journey starts on the world we know.
+ * Scale note — one scene unit is one Earth radius (6,371 km); nothing else is
+ * drawn to scale here, only the world itself. The headline Earth is the real
+ * thing: NASA's Blue Marble day colour, relief, ocean gloss and cloud shell, so
+ * the journey starts on the world we know.
  */
 
 const SPACE = '#04010c'
-/** Everything that is "sky" (stars, Milky Way, the distant system) sits here. */
+/** Everything that is "sky" (stars, Milky Way) sits here. */
 const SKY_RADIUS = 600
 const EARTH_TILT = THREE.MathUtils.degToRad(23.4)
-const TAU = Math.PI * 2
 
 /** Opening viewpoint: close enough that Earth fills the frame. */
 const HOME_CAMERA = new THREE.Vector3(0.86, 0.47, 3.2)
-/**
- * Earth is staged low and left so the upper-right of the frame is open sky —
- * that is where the Sun and the rest of the system hang.
- */
+/** Earth is staged low and left, leaving open sky across the top of the frame. */
 const VIEW_SHIFT_X = 0.11
 const VIEW_SHIFT_Y = -0.13
 const CAMERA_AXIS = HOME_CAMERA.clone().normalize()
@@ -43,46 +36,17 @@ const SCREEN_RIGHT = new THREE.Vector3()
 const SCREEN_UP = new THREE.Vector3().crossVectors(CAMERA_AXIS, SCREEN_RIGHT).normalize()
 
 /**
- * The Sun is staged just beyond Earth's upper-right limb, and the key light
- * carries the same offset, so the brightest part of Earth's disc and the limb
- * glow both face the visible Sun. One offset, one reading — see the scale note
- * above: a real Sun this close to Earth's disc would put us on the night side,
- * which is not the opening shot this screen is for.
+ * The key light: upper right and a little behind the camera, so Earth reads
+ * sunlit with its terminator toward the lower left.
  */
-const SUN_ANGLE = THREE.MathUtils.degToRad(22)
-const SUN_AZIMUTH = THREE.MathUtils.degToRad(34)
-const SUN_DISTANCE = 400
-/** Screen-space offset of the Sun (up and to the right) from Earth's centre. */
-const SUN_OFFSET = SCREEN_UP.clone()
-  .multiplyScalar(Math.sin(SUN_ANGLE) * Math.cos(SUN_AZIMUTH))
-  .add(SCREEN_RIGHT.clone().multiplyScalar(Math.sin(SUN_ANGLE) * Math.sin(SUN_AZIMUTH)))
-/** Where the Sun is drawn: past Earth, so it sits in the sky on screen. */
-const SUN_DIRECTION = SUN_OFFSET.clone()
-  .addScaledVector(CAMERA_AXIS, -Math.cos(SUN_ANGLE))
+const LIGHT_ANGLE = THREE.MathUtils.degToRad(22)
+const LIGHT_AZIMUTH = THREE.MathUtils.degToRad(34)
+const KEY_LIGHT_DIRECTION = SCREEN_UP.clone()
+  .multiplyScalar(Math.sin(LIGHT_ANGLE) * Math.cos(LIGHT_AZIMUTH))
+  .add(SCREEN_RIGHT.clone().multiplyScalar(Math.sin(LIGHT_ANGLE) * Math.sin(LIGHT_AZIMUTH)))
+  .addScaledVector(CAMERA_AXIS, Math.cos(LIGHT_ANGLE))
   .normalize()
-/** Where the light comes from: the same direction seen from the camera side. */
-const SUN_LIGHT_DIRECTION = SUN_OFFSET.clone()
-  .addScaledVector(CAMERA_AXIS, Math.cos(SUN_ANGLE))
-  .normalize()
-const SUN_POSITION = SUN_DIRECTION.clone().multiplyScalar(SUN_DISTANCE)
-const SUN_LIGHT_POSITION = SUN_LIGHT_DIRECTION.clone().multiplyScalar(SUN_DISTANCE)
-const SUN_RADIUS = SUN_DISTANCE * Math.tan(THREE.MathUtils.degToRad(2.6))
-
-/** The system's orbit plane, seen from Earth: tilted, mostly face-on. */
-const SYSTEM_ROTATION = new THREE.Quaternion()
-  .setFromAxisAngle(SCREEN_RIGHT, THREE.MathUtils.degToRad(32))
-  .multiply(
-    new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), CAMERA_AXIS),
-  )
-
-/** The other worlds in the sky — illustrative companions, not true positions. */
-const NEIGHBOURS = [
-  { orbit: 45, angle: 0.4, size: 3, color: '#f2dcae' },
-  { orbit: 45, angle: 3.5, size: 2.4, color: '#d9c39a' },
-  { orbit: 70, angle: 5.4, size: 6, color: '#e8c79a', halo: '#ffd9a1', haloScale: 3 },
-  { orbit: 100, angle: 3.4, size: 5, color: '#dbc79b', ring: true },
-  { orbit: 130, angle: 1.1, size: 3.8, color: '#a9c9e6', halo: '#bcdcf5', haloScale: 3 },
-]
+const KEY_LIGHT_POSITION = KEY_LIGHT_DIRECTION.clone().multiplyScalar(SKY_RADIUS)
 
 /* --------------------------------------------------------------- textures -- */
 
@@ -262,7 +226,7 @@ function AtmosphereShell({ scale, color, power, strength }) {
       new THREE.ShaderMaterial({
         uniforms: {
           uColor: { value: new THREE.Color(color) },
-          uSun: { value: SUN_LIGHT_DIRECTION.clone() },
+          uSun: { value: KEY_LIGHT_DIRECTION.clone() },
           uPower: { value: power },
           uStrength: { value: strength },
         },
@@ -323,123 +287,6 @@ function Earth() {
       </group>
       <AtmosphereShell scale={1.014} color="#8ec6ff" power={2.8} strength={0.95} />
       <AtmosphereShell scale={1.055} color="#3d74c8" power={1.7} strength={0.4} />
-    </group>
-  )
-}
-
-/* ------------------------------------------------------- the Solar System -- */
-
-/** The Sun, small in the distance: textured photosphere wrapped in warm glows. */
-function Sun({ glow }) {
-  const surface = useMemo(createSunSurfaceTexture, [])
-  const core = useRef()
-  useEffect(() => () => surface.dispose(), [surface])
-  useFrame((_, delta) => {
-    if (core.current) core.current.rotation.y += delta * 0.03
-  })
-
-  const layers = [
-    { scale: 1.5, color: '#fff2cf', opacity: 0.9 },
-    { scale: 2.6, color: '#ffb75e', opacity: 0.45 },
-    { scale: 4.6, color: '#ff8a24', opacity: 0.16 },
-  ]
-
-  return (
-    <group>
-      <mesh ref={core}>
-        <sphereGeometry args={[SUN_RADIUS, 48, 48]} />
-        <meshBasicMaterial map={surface} toneMapped={false} />
-      </mesh>
-      {layers.map((layer) => (
-        <sprite key={layer.scale} scale={[SUN_RADIUS * layer.scale, SUN_RADIUS * layer.scale, 1]}>
-          <spriteMaterial
-            map={glow}
-            color={layer.color}
-            transparent
-            opacity={layer.opacity}
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-          />
-        </sprite>
-      ))}
-    </group>
-  )
-}
-
-/** One drawn orbit around the Sun — a thin cool ring, as on the star map. */
-function OrbitArc({ radius }) {
-  const geometry = useMemo(() => {
-    const segments = 220
-    const points = []
-    for (let i = 0; i < segments; i += 1) {
-      const angle = (i / segments) * TAU
-      points.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius))
-    }
-    return new THREE.BufferGeometry().setFromPoints(points)
-  }, [radius])
-
-  useEffect(() => () => geometry.dispose(), [geometry])
-
-  return (
-    <lineLoop geometry={geometry}>
-      <lineBasicMaterial color="#5f93c9" transparent opacity={0.45} depthWrite={false} />
-    </lineLoop>
-  )
-}
-
-/** A neighbour on its orbit: a small bright disc, plus Saturn's ring and halos. */
-function Neighbour({ body, glow }) {
-  const position = useMemo(
-    () => new THREE.Vector3(Math.cos(body.angle) * body.orbit, 0, Math.sin(body.angle) * body.orbit),
-    [body],
-  )
-
-  return (
-    <group position={position}>
-      <mesh>
-        <sphereGeometry args={[body.size, 24, 24]} />
-        <meshBasicMaterial color={body.color} toneMapped={false} />
-      </mesh>
-      {body.ring && (
-        <mesh rotation={[-Math.PI / 2 + 0.42, 0, 0.3]}>
-          <ringGeometry args={[body.size * 1.45, body.size * 2.4, 64]} />
-          <meshBasicMaterial
-            color="#d8c39a"
-            transparent
-            opacity={0.6}
-            side={THREE.DoubleSide}
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </mesh>
-      )}
-      {body.halo && (
-        <sprite scale={[body.size * body.haloScale, body.size * body.haloScale, 1]}>
-          <spriteMaterial
-            map={glow}
-            color={body.halo}
-            transparent
-            opacity={0.4}
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-          />
-        </sprite>
-      )}
-    </group>
-  )
-}
-
-/** The rest of the system, hanging in the sky behind Earth. */
-function SolarSystemBackdrop({ glow }) {
-  return (
-    <group position={SUN_POSITION} quaternion={SYSTEM_ROTATION}>
-      <Sun glow={glow} />
-      {[45, 70, 100, 130].map((radius) => (
-        <OrbitArc key={radius} radius={radius} />
-      ))}
-      {NEIGHBOURS.map((body, index) => (
-        <Neighbour key={index} body={body} glow={glow} />
-      ))}
     </group>
   )
 }
@@ -552,7 +399,7 @@ function OrbitRig({ onZoomOut, onLimitChange }) {
 
 /**
  * Frame the globe: a wide lens on tall screens, and Earth set a little below
- * centre so the Sun and the drawn orbits keep the upper band of the sky.
+ * centre so the sky keeps the upper band of the frame.
  */
 function ResponsiveFraming() {
   const { camera, size } = useThree()
@@ -583,10 +430,9 @@ function Scene({ onZoomOut, onLimitChange }) {
       <color attach="background" args={[SPACE]} />
       <ResponsiveFraming />
       <ambientLight intensity={0.1} color="#5f7bb8" />
-      <directionalLight position={SUN_LIGHT_POSITION} intensity={2.7} color="#fff1d6" />
+      <directionalLight position={KEY_LIGHT_POSITION} intensity={2.7} color="#fff1d6" />
       <MilkyWay />
       <StarField glow={glow} />
-      <SolarSystemBackdrop glow={glow} />
       <Earth />
       <OrbitRig onZoomOut={onZoomOut} onLimitChange={onLimitChange} />
     </>
