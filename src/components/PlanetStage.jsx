@@ -11,13 +11,18 @@ import {
   mulberry32,
   hashString,
 } from '../lib/planet'
-import { getEarthTextures, EARTH_ATMOSPHERE } from '../lib/earthTexture'
+import { EARTH_ATMOSPHERE, EARTH_SUN_DIRECTION, useEarthTextures } from '../lib/earthTexture'
 import { describeAge } from '../lib/aging'
 import { formatNumber } from '../lib/physics'
 import BobbleFigure from './BobbleFigure'
 import SkeletonFigure from './SkeletonFigure'
 
 const UP = new THREE.Vector3(0, 1, 0)
+
+/* Where the host star sits in an exoplanet's sky; Earth aims its own star at
+ * EARTH_SUN_DIRECTION so the day side matches the real planet. */
+const STAR_DIRECTION = [-0.55, 0.45, -0.7]
+const EARTH_NORMAL_SCALE = new THREE.Vector2(0.9, 0.9)
 
 /* The crew stands on the surface, so their size is fixed in planet radii.
  * ~0.07 of a planet radius keeps a human visible without pretending a person is
@@ -27,9 +32,10 @@ const CREW_SCALE = 0.07
 function PlanetMesh({ planet, earthYears, alienYears }) {
   const isEarth = planet.kind === 'earth'
   const { texture, look } = useMemo(() => createPlanetTexture(planet), [planet])
-  // Earth is the one world with a known surface: real continents and a cloud
-  // shell instead of an inferred palette.
-  const earth = useMemo(() => (isEarth ? getEarthTextures() : null), [isEarth])
+  // Earth is the one world with a known surface: real continents, relief, ocean
+  // glint, city lights and a cloud shell instead of an inferred palette.
+  const earthTextures = useEarthTextures()
+  const earth = isEarth ? earthTextures : null
   const tilt = useMemo(() => {
     if (isEarth) return 0.409 // 23.4° axial tilt
     const rand = mulberry32(hashString(planet.name))
@@ -49,30 +55,88 @@ function PlanetMesh({ planet, earthYears, alienYears }) {
     <group rotation={[0, 0, tilt]}>
       <group ref={spin}>
         <mesh>
-          <sphereGeometry args={[1, 96, 96]} />
-          <meshStandardMaterial
-            map={earth ? earth.surface : texture}
-            roughness={earth ? 0.78 : 0.9}
-            metalness={earth ? 0.02 : 0.03}
-          />
+          <sphereGeometry args={[1, 128, 128]} />
+          {earth ? (
+            <meshPhongMaterial
+              map={earth.surface}
+              normalMap={earth.normal}
+              normalScale={EARTH_NORMAL_SCALE}
+              specularMap={earth.specular}
+              specular="#3a6484"
+              shininess={24}
+            />
+          ) : (
+            <meshStandardMaterial map={texture} roughness={0.9} metalness={0.03} />
+          )}
         </mesh>
+        {earth && <NightLights map={earth.lights} />}
         <SurfaceCrew planet={planet} look={look} earthYears={earthYears} alienYears={alienYears} />
       </group>
       {earth && (
-        <mesh ref={clouds} scale={1.006}>
-          <sphereGeometry args={[1, 96, 96]} />
-          <meshStandardMaterial
-            map={earth.clouds}
+        <mesh ref={clouds} scale={1.008}>
+          <sphereGeometry args={[1, 128, 128]} />
+          <meshPhongMaterial
+            color="#ffffff"
+            alphaMap={earth.clouds}
             transparent
-            opacity={0.85}
-            roughness={1}
-            metalness={0}
+            opacity={0.92}
             depthWrite={false}
+            shininess={2}
           />
         </mesh>
       )}
       <Atmosphere color={earth ? EARTH_ATMOSPHERE : look.atmosphere} rim={isEarth} />
     </group>
+  )
+}
+
+/**
+ * City lights. They ride on a shell just above the surface and are masked by the
+ * same direction as Earth's sun, so they only appear where the planet is dark —
+ * the warm dotted edge along the night side that makes the globe read as inhabited.
+ */
+function NightLights({ map }) {
+  const uniforms = useMemo(
+    () => ({
+      uMap: { value: map },
+      uSun: { value: new THREE.Vector3(...EARTH_SUN_DIRECTION).normalize() },
+      uIntensity: { value: 1 },
+    }),
+    [map],
+  )
+
+  return (
+    <mesh scale={1.002}>
+      <sphereGeometry args={[1, 128, 128]} />
+      <shaderMaterial
+        uniforms={uniforms}
+        transparent
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+        vertexShader={`
+          varying vec2 vUv;
+          varying vec3 vWorldNormal;
+          void main() {
+            vUv = uv;
+            vWorldNormal = normalize(mat3(modelMatrix) * normal);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `}
+        fragmentShader={`
+          uniform sampler2D uMap;
+          uniform vec3 uSun;
+          uniform float uIntensity;
+          varying vec2 vUv;
+          varying vec3 vWorldNormal;
+          void main() {
+            vec3 lights = texture2D(uMap, vUv).rgb;
+            float lit = dot(normalize(vWorldNormal), normalize(uSun));
+            float night = 1.0 - smoothstep(-0.22, 0.14, lit);
+            gl_FragColor = vec4(lights * night * uIntensity, 1.0);
+          }
+        `}
+      />
+    </mesh>
   )
 }
 
@@ -214,15 +278,15 @@ function SurfaceCrew({ planet, look, earthYears, alienYears }) {
  * planet's orbit — so a hot Jupiter's sun fills the sky while a distant world
  * sees a small disc. Star and planet therefore keep their true relative size.
  */
-function HostStar({ planet }) {
+function HostStar({ planet, direction = STAR_DIRECTION, intensity = 2.4 }) {
   const color = useMemo(() => starColor(planet.starTeffK), [planet.starTeffK])
   const angle = starAngularDiameterDeg(planet) ?? 1.5
   const distance = 20
   const radius = THREE.MathUtils.clamp(Math.tan((angle * Math.PI) / 360) * distance, 0.08, 7)
   const position = useMemo(() => {
-    const direction = new THREE.Vector3(-0.55, 0.45, -0.7).normalize()
-    return direction.multiplyScalar(distance).toArray()
-  }, [])
+    const vector = new THREE.Vector3(...direction).normalize()
+    return vector.multiplyScalar(distance).toArray()
+  }, [direction])
 
   return (
     <group position={position}>
@@ -241,7 +305,7 @@ function HostStar({ planet }) {
           toneMapped={false}
         />
       </mesh>
-      <directionalLight position={[0, 0, 0]} intensity={2.4} color={color} />
+      <directionalLight position={[0, 0, 0]} intensity={intensity} color={color} />
     </group>
   )
 }
@@ -306,13 +370,22 @@ function OrbitRig() {
 }
 
 function Scene({ planet, earthYears, alienYears }) {
+  const isEarth = planet.kind === 'earth'
   return (
     <>
-      <ambientLight intensity={0.22} />
+      <ambientLight intensity={isEarth ? 0.08 : 0.22} />
       {/* camera-side fill so the visible hemisphere reads; the host star is the key light */}
-      <directionalLight position={[2.6, 1.2, 5.5]} intensity={0.95} color="#ffffff" />
+      <directionalLight
+        position={[2.6, 1.2, 5.5]}
+        intensity={isEarth ? 0.3 : 0.95}
+        color="#ffffff"
+      />
       <StarField />
-      <HostStar planet={planet} />
+      <HostStar
+        planet={planet}
+        direction={isEarth ? EARTH_SUN_DIRECTION : STAR_DIRECTION}
+        intensity={isEarth ? 2 : 2.4}
+      />
       <PlanetMesh planet={planet} earthYears={earthYears} alienYears={alienYears} />
       <OrbitRig />
     </>
