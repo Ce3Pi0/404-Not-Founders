@@ -258,10 +258,13 @@ export default function App() {
     })
 
   // The 3D map edits the same origin/destination state as the picker.
+  // "Plan travel" in the map panels is the flight plan's own entry point: it
+  // selects the destination and opens the planner directly, never the home view.
   const mapSetDestination = (next) => {
     if (!next || next.id === location.id) return
     setPlanet(next)
-    goTo('destination')
+    navigate(TRAVEL_PATH)
+    setStepState('flight')
   }
 
   const mapSetOrigin = (next) => {
@@ -356,7 +359,6 @@ export default function App() {
       <Header
         step={step}
         sim={sim}
-        location={location}
         onGoHome={goHome}
         onAbout={() => setAboutOpen(true)}
         onReset={reset}

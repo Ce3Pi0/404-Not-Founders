@@ -35,7 +35,6 @@ function Brand() {
 export default function Header({
   step,
   sim,
-  location,
   onGoHome,
   onAbout,
   onReset,
@@ -44,22 +43,10 @@ export default function Header({
   inMap = false,
   onOpenMap,
 }) {
-  const away = location && location.kind !== 'earth'
-
   return (
     <header className="sticky top-0 z-40 border-b border-line/60 bg-void/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 lg:px-8">
         <Brand />
-
-        {(location || away) && (
-          <div className="hidden min-w-0 items-center gap-2 rounded-lg border border-line/60 bg-panel/25 px-3 py-1.5 sm:flex">
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ion" />
-            <div className="min-w-0">
-              <div className="text-[9px] tracking-[0.16em] text-ink/45 uppercase">Current location</div>
-              <div className="truncate text-[11px] text-ink">{location?.name}</div>
-            </div>
-          </div>
-        )}
 
         <nav aria-label="Mission stages" className="hidden items-center gap-2 md:flex">
           {STEPS.map((entry, index) => {

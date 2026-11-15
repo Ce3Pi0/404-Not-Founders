@@ -55,3 +55,45 @@ export function createHaloTexture() {
   texture.needsUpdate = true
   return texture
 }
+
+/**
+ * A crisp, thin circle. Used for the Solar System's home outline and for route
+ * endpoints, where a bloom alone would read as an anonymous bright blob.
+ */
+export function createRingTexture(lineWidth = 3) {
+  const size = 256
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const context = canvas.getContext('2d')
+  const centre = size / 2
+  context.strokeStyle = 'rgba(255,255,255,1)'
+  context.lineWidth = lineWidth
+  context.beginPath()
+  context.arc(centre, centre, size * 0.42, 0, Math.PI * 2)
+  context.stroke()
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+  return texture
+}
+
+/** Small text sprite, used to name the grid rings in the scene itself. */
+export function createTextTexture(text, color = '#9fe9ff') {
+  const width = 256
+  const height = 64
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  context.clearRect(0, 0, width, height)
+  context.font = '600 26px "IBM Plex Mono", ui-monospace, monospace'
+  context.textAlign = 'center'
+  context.textBaseline = 'middle'
+  context.fillStyle = color
+  context.fillText(text, width / 2, height / 2)
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+  return texture
+}
