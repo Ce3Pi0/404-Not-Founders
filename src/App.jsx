@@ -38,6 +38,9 @@ export default function App() {
   const [beta, setBeta] = useState(0.8)
   const [shipName, setShipName] = useState('Odyssey')
   const [mission, setMission] = useState(null)
+  // The debrief only exists once the ship has actually arrived; until then its
+  // clocks are the planned voyage, not time that has elapsed.
+  const [missionArrived, setMissionArrived] = useState(false)
   const [sim, setSim] = useState(loadSimulation)
   const [aboutOpen, setAboutOpen] = useState(false)
   // Set when the map is entered from Earth orbit, so it opens on the Solar
@@ -91,6 +94,7 @@ export default function App() {
 
   /** Every step transition leaves a deep link, so the URL never lies. */
   const goTo = (next) => {
+    if (next === 'journey') setMissionArrived(false)
     navigate('/')
     setStepState(next)
   }
@@ -129,6 +133,7 @@ export default function App() {
   const arrive = () => {
     if (!mission || recordedMission.current === mission.startedAt) return
     recordedMission.current = mission.startedAt
+    setMissionArrived(true)
     setSim((current) => recordMission(current, mission))
     usePhysicsStore.getState().recordResult(mission)
     setLocation(mission.destinationPlanet ?? planet)
@@ -137,6 +142,7 @@ export default function App() {
   /** Live Flight → Travel Planner, abandoning the run in progress. */
   const backToPlanner = () => {
     setMission(null)
+    setMissionArrived(false)
     navigate(TRAVEL_PATH)
     setStepState('flight')
   }
@@ -148,6 +154,7 @@ export default function App() {
     mapViewState.current.planetId = arrival.id
     setPlanet(arrival)
     setMission(null)
+    setMissionArrived(false)
     exploreSystem({ name: arrival.star })
   }
 
@@ -158,6 +165,7 @@ export default function App() {
   const returnToEarthFromFlight = () => {
     const here = location
     setMission(null)
+    setMissionArrived(false)
     if (here.kind === 'earth') {
       goTo('destination')
       return
@@ -169,6 +177,7 @@ export default function App() {
   const nextMission = () => {
     const here = location
     setMission(null)
+    setMissionArrived(false)
     if (planet.id === here.id) {
       // The next hop crosses to another host system, not a sibling world.
       const replacement = nearbyPlanets(here, 12).find(
@@ -182,6 +191,7 @@ export default function App() {
   const goHome = () => {
     setLocation(EARTH)
     setMission(null)
+    setMissionArrived(false)
     if (planet.kind === 'earth') {
       const replacement = nearbyPlanets(EARTH, 8).find((entry) => entry.id !== EARTH.id)
       if (replacement) setPlanet(replacement)
@@ -311,6 +321,7 @@ export default function App() {
     setLocation(EARTH)
     setPlanet(DEFAULT_PLANET)
     setMission(null)
+    setMissionArrived(false)
     goTo('destination')
   }
 
@@ -326,9 +337,11 @@ export default function App() {
         onGoHome={goHome}
         onAbout={() => setAboutOpen(true)}
         onReset={reset}
+        canDebrief={Boolean(mission) && missionArrived}
         onSelectStep={(target) => {
-          // Journey and debrief only exist once a mission has launched.
-          if ((target === 'journey' || target === 'debrief') && !mission) return
+          // Journey needs a launched mission; the debrief needs an arrival.
+          if (target === 'journey' && !mission) return
+          if (target === 'debrief' && !(mission && missionArrived)) return
           goTo(target)
         }}
         inMap={step === 'map'}
@@ -459,7 +472,7 @@ export default function App() {
           />
         )}
 
-        {step === 'debrief' && mission && (
+        {step === 'debrief' && mission && missionArrived && (
           <Debrief
             mission={mission}
             planet={planet}

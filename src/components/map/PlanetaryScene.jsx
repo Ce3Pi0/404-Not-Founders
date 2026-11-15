@@ -18,6 +18,9 @@ function StarField({ extent, glow }) {
     const rand = mulberry32(90210)
     const count = 900
     const positions = new Float32Array(count * 3)
+    const colors = new Float32Array(count * 3)
+    const palette = ['#ffffff', '#dbe9ff', '#b9d0ff', '#ffe8c2', '#ffc79a', '#ff9f7e']
+    const tint = new THREE.Color()
     for (let i = 0; i < count; i += 1) {
       const u = rand() * 2 - 1
       const theta = rand() * Math.PI * 2
@@ -26,9 +29,13 @@ function StarField({ extent, glow }) {
       positions[i * 3] = Math.cos(theta) * ring * radius
       positions[i * 3 + 1] = u * radius
       positions[i * 3 + 2] = Math.sin(theta) * ring * radius
+      tint.set(palette[Math.floor(rand() * palette.length)])
+      const brightness = 0.45 + rand() * 0.55
+      colors.set([tint.r * brightness, tint.g * brightness, tint.b * brightness], i * 3)
     }
     const buffer = new THREE.BufferGeometry()
     buffer.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    buffer.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     return buffer
   }, [extent])
 
@@ -40,9 +47,9 @@ function StarField({ extent, glow }) {
         map={glow}
         size={1.7}
         sizeAttenuation={false}
-        color="#ffffff"
+        vertexColors
         transparent
-        opacity={0.32}
+        opacity={0.38}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
       />
@@ -373,7 +380,7 @@ function SceneRig({
 
   return (
     <>
-      <color attach="background" args={['#160040']} />
+      <color attach="background" args={['#000000']} />
       <StarField extent={system.extentAu} glow={glow} />
       <HostStar star={system.star} glow={glow} />
       {orbitsOn &&
