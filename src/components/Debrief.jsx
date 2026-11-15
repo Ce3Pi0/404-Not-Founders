@@ -2,8 +2,6 @@ import {
   formatDays,
   formatNumber,
   formatYears,
-  percentError,
-  predictionRank,
   surfaceClockRate,
   surfaceGravity,
 } from '../lib/physics'
@@ -24,55 +22,6 @@ function tinyPercent(value) {
   const pct = value * 100
   if (pct >= 0.001) return `${pct.toPrecision(2)}%`
   return `${pct.toExponential(1)}%`
-}
-
-function PredictionCard({ prediction, mission }) {
-  const guessEarth = prediction.earth === '' ? null : Number(prediction.earth)
-  const guessShip = prediction.ship === '' ? null : Number(prediction.ship)
-  const earthError = percentError(guessEarth, mission.earthYears)
-  const shipError = percentError(guessShip, mission.shipYears)
-  const rank = predictionRank(earthError, shipError)
-  const filed = earthError != null || shipError != null
-
-  return (
-    <section className="panel p-5">
-      <div className="flex items-baseline justify-between gap-3">
-        <div className="label">Your prediction</div>
-        <span className="rounded-full border border-line bg-white/[0.03] px-2 py-0.5 text-[10px] text-ink/80">
-          {rank.title}
-        </span>
-      </div>
-
-      {filed ? (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <div className="rounded-lg border border-line/70 bg-void/40 px-3 py-2">
-            <div className="text-[9px] tracking-[0.14em] text-muted uppercase">Earth</div>
-            <div className="mt-1 text-[12px] text-ink">
-              you {formatNumber(guessEarth, 2)} · actual {formatNumber(mission.earthYears, 2)} yr
-            </div>
-            <div className="mt-0.5 text-[10px] text-muted">
-              {earthError != null ? `${earthError.toFixed(1)}% off` : 'not guessed'}
-            </div>
-          </div>
-          <div className="rounded-lg border border-line/70 bg-void/40 px-3 py-2">
-            <div className="text-[9px] tracking-[0.14em] text-muted uppercase">Ship</div>
-            <div className="mt-1 text-[12px] text-ink">
-              you {formatNumber(guessShip, 2)} · actual {formatNumber(mission.shipYears, 2)} yr
-            </div>
-            <div className="mt-0.5 text-[10px] text-muted">
-              {shipError != null ? `${shipError.toFixed(1)}% off` : 'not guessed'}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <p className="mt-3 text-[12px] text-muted">
-          No prediction filed this mission — fly the route again and lock in a guess before launch.
-        </p>
-      )}
-
-      <p className="mt-2 text-[11px] leading-relaxed text-muted">{rank.note}</p>
-    </section>
-  )
 }
 
 function PhysicsCard({ mission, planet }) {
@@ -214,7 +163,7 @@ function MissionLog({ sim, planet, onNext, onReset, onGoHome }) {
   )
 }
 
-export default function Debrief({ mission, planet, origin, prediction, sim, onNext, onReset, onGoHome }) {
+export default function Debrief({ mission, planet, origin, sim, onNext, onReset, onGoHome }) {
   const look = classifyPlanet(planet)
   const ratio = mission.gamma
 
@@ -260,7 +209,6 @@ export default function Debrief({ mission, planet, origin, prediction, sim, onNe
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-4">
           <CrewLineup planet={planet} sim={sim} shipName={mission.shipName} />
-          <PredictionCard prediction={prediction} mission={mission} />
         </div>
         <div className="min-w-0 space-y-4">
           <PhysicsCard mission={mission} planet={planet} />

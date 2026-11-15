@@ -185,7 +185,7 @@ function StarField({ glow }) {
   )
 }
 
-function RouteLine({ from, to }) {
+function RouteLine({ from, to, glow = false }) {
   const line = useMemo(() => {
     const geometry = new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(...from),
@@ -202,12 +202,103 @@ function RouteLine({ from, to }) {
     )
   }, [from, to])
 
+  /** The planner's route gets a soft additive tube so the path reads as glowing. */
+  const halo = useMemo(() => {
+    if (!glow) return null
+    const a = new THREE.Vector3(...from)
+    const b = new THREE.Vector3(...to)
+    const length = a.distanceTo(b)
+    if (length <= 0) return null
+    const geometry = new THREE.TubeGeometry(
+      new THREE.LineCurve3(a, b),
+      1,
+      Math.max(0.1, length * 0.004),
+      8,
+      false,
+    )
+    return new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({
+        color: '#5ee7ff',
+        transparent: true,
+        opacity: 0.34,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    )
+  }, [from, to, glow])
+
   useEffect(() => () => {
     line.geometry.dispose()
     line.material.dispose()
   }, [line])
 
-  return <primitive object={line} />
+  useEffect(() => () => {
+    if (!halo) return
+    halo.geometry.dispose()
+    halo.material.dispose()
+  }, [halo])
+
+  return (
+    <>
+      <primitive object={line} />
+      {halo && <primitive object={halo} />}
+    </>
+  )
+}
+
+/**
+ * The planner's spacecraft, parked at the departure star. It keeps a constant
+ * on-screen size and points along the route.
+ */
+function ShipMarker({ ship, glow }) {
+  const scaleRef = useRef(null)
+  const origin = useMemo(() => new THREE.Vector3(...ship.position), [ship.position])
+  const quaternion = useMemo(() => {
+    const direction = new THREE.Vector3(...ship.to).sub(origin)
+    if (direction.lengthSq() < 1e-9) return new THREE.Quaternion()
+    return new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      direction.normalize(),
+    )
+  }, [origin, ship.to])
+
+  useFrame(({ camera }) => {
+    if (!scaleRef.current) return
+    const size = Math.max(0.5, camera.position.distanceTo(origin) * 0.035)
+    scaleRef.current.scale.setScalar(size)
+  })
+
+  return (
+    <group position={ship.position} quaternion={quaternion}>
+      <group ref={scaleRef}>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.12, 0.16, 0.55, 14]} />
+          <meshStandardMaterial color="#ffffff" metalness={0.35} roughness={0.42} />
+        </mesh>
+        <mesh position={[0, 0, 0.42]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.12, 0.3, 14]} />
+          <meshStandardMaterial color="#ffffff" metalness={0.3} roughness={0.35} />
+        </mesh>
+        {[-1, 1].map((side) => (
+          <mesh key={side} position={[side * 0.16, 0, -0.12]}>
+            <boxGeometry args={[0.26, 0.03, 0.1]} />
+            <meshStandardMaterial color="#4c0070" roughness={0.6} />
+          </mesh>
+        ))}
+        <sprite position={[0, 0, -0.42]} scale={[1.1, 1.1, 1]}>
+          <spriteMaterial
+            map={glow}
+            color="#5ee7ff"
+            transparent
+            opacity={0.9}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
+        </sprite>
+      </group>
+    </group>
+  )
 }
 
 /**
@@ -316,6 +407,12 @@ function SceneRig({
   focus,
   onSelect,
   onHover,
+  routeGlow = false,
+  ship = null,
+  shipAnchorRef = null,
+  view = null,
+  maxDistance = 700,
+  far = 4000,
 }) {
   const { camera, gl, size } = useThree()
   const controls = useMemo(() => new OrbitControls(camera, gl.domElement), [camera, gl])
@@ -323,6 +420,7 @@ function SceneRig({
   const hoverAt = useRef(0)
   const tween = useRef(null)
   const firstReset = useRef(true)
+  const firstView = useRef(true)
   const haloTexture = useMemo(createHaloTexture, [])
 
   useEffect(() => {
@@ -332,9 +430,20 @@ function SceneRig({
     controls.zoomSpeed = 0.9
     controls.panSpeed = 0.8
     controls.minDistance = 2
-    controls.maxDistance = 700
+    controls.maxDistance = maxDistance
     return () => controls.dispose()
   }, [controls])
+
+  /** A long route needs a deeper zoom-out limit; keep the live controls. */
+  useEffect(() => {
+    controls.maxDistance = maxDistance
+  }, [controls, maxDistance])
+
+  /** Keep the far plane past the most distant destination the planner frames. */
+  useEffect(() => {
+    camera.far = far
+    camera.updateProjectionMatrix()
+  }, [camera, far])
 
   /**
    * Restore the framing the map was left with (the system page's Back control
@@ -350,6 +459,26 @@ function SceneRig({
     }
     controls.update()
   }, [camera, controls, cameraState])
+
+  /** Frame a whole route: the planner hands in a camera position and target. */
+  useEffect(() => {
+    if (!view?.position || !view?.target) return
+    if (firstView.current) {
+      firstView.current = false
+      camera.position.set(...view.position)
+      controls.target.set(...view.target)
+      controls.update()
+      return
+    }
+    tween.current = {
+      fromPos: camera.position.clone(),
+      fromTarget: controls.target.clone(),
+      toPos: new THREE.Vector3(...view.position),
+      toTarget: new THREE.Vector3(...view.target),
+      elapsed: 0,
+      duration: 1.05,
+    }
+  }, [camera, controls, view])
 
   /** Reset glides home instead of snapping, and forgets the saved framing. */
   useEffect(() => {
@@ -492,7 +621,7 @@ function SceneRig({
       cameraState.target = controls.target.toArray()
     }
 
-    const layer = labelsRef.current
+    const layer = labelsRef?.current
     if (layer) {
       const children = layer.children
       for (let i = 0; i < children.length; i += 1) {
@@ -520,7 +649,32 @@ function SceneRig({
       }
     }
 
-    if (scaleBarRef.current && scaleTextRef.current) {
+    // The planner's speed panel rides on the spacecraft itself.
+    const anchor = shipAnchorRef?.current
+    if (anchor) {
+      if (!ship?.position) {
+        anchor.style.visibility = 'hidden'
+      } else {
+        projection.set(...ship.position).project(camera)
+        const x = (projection.x * 0.5 + 0.5) * size.width
+        const y = (-projection.y * 0.5 + 0.5) * size.height
+        if (
+          projection.z < -1 ||
+          projection.z > 1 ||
+          x < -40 ||
+          x > size.width + 40 ||
+          y < -40 ||
+          y > size.height + 40
+        ) {
+          anchor.style.visibility = 'hidden'
+        } else {
+          anchor.style.visibility = 'visible'
+          anchor.style.transform = `translate3d(${x}px, ${y}px, 0)`
+        }
+      }
+    }
+
+    if (scaleBarRef?.current && scaleTextRef?.current) {
       const distance = camera.position.distanceTo(controls.target)
       const worldPerPixel =
         (2 * distance * Math.tan((camera.fov * Math.PI) / 360)) / Math.max(1, size.height)
@@ -529,7 +683,7 @@ function SceneRig({
       scaleTextRef.current.textContent = `${lightYears} ly`
     }
 
-    if (cameraQuaternionRef.current) {
+    if (cameraQuaternionRef?.current) {
       cameraQuaternionRef.current.copy(camera.quaternion).invert()
     }
   })
@@ -550,7 +704,8 @@ function SceneRig({
       <MarkerPoints entries={selectedEntries} glow={glow} color={CYAN} size={16} />
       {selected && <SelectedHalo entry={selected} haloTexture={haloTexture} glow={glow} />}
       <SolarOrigin glow={glow} />
-      {route && <RouteLine from={route.from} to={route.to} />}
+      {route && <RouteLine from={route.from} to={route.to} glow={routeGlow} />}
+      {ship && <ShipMarker ship={ship} glow={glow} />}
       {distanceTo && <DistanceLine from={distanceTo.from} to={distanceTo.to} />}
     </>
   )
@@ -575,6 +730,12 @@ export default function UniverseScene({
   focus,
   onSelect,
   onHover,
+  routeGlow,
+  ship,
+  shipAnchorRef,
+  view,
+  maxDistance,
+  far = 4000,
 }) {
   const glow = useMemo(createGlowTexture, [])
 
@@ -592,7 +753,7 @@ export default function UniverseScene({
 
   return (
     <Canvas
-      camera={{ position: HOME_CAMERA, fov: 55, near: 0.1, far: 4000 }}
+      camera={{ position: HOME_CAMERA, fov: 55, near: 0.1, far }}
       dpr={[1, 2]}
       gl={{ antialias: true }}
     >
@@ -614,6 +775,12 @@ export default function UniverseScene({
         focus={focus}
         onSelect={onSelect}
         onHover={onHover}
+        routeGlow={routeGlow}
+        ship={ship}
+        shipAnchorRef={shipAnchorRef}
+        view={view}
+        maxDistance={maxDistance}
+        far={far}
       />
     </Canvas>
   )

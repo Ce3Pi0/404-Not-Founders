@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Header from './components/Header'
 import DestinationPicker from './components/DestinationPicker'
 import PlanetStage from './components/PlanetStage'
-import FlightPlan from './components/FlightPlan'
+import TravelPlanner from './components/TravelPlanner'
 import JourneyStage from './components/JourneyStage'
 import Debrief from './components/Debrief'
 import AboutDialog from './components/AboutDialog'
@@ -31,9 +31,8 @@ export default function App() {
     const id = planetIdFromPath(window.location.pathname)
     return id ? planetById(id) : DEFAULT_PLANET
   })
-  const [beta, setBeta] = useState(0.9)
+  const [beta, setBeta] = useState(0.8)
   const [shipName, setShipName] = useState('Odyssey')
-  const [prediction, setPrediction] = useState({ earth: '', ship: '' })
   const [mission, setMission] = useState(null)
   const [sim, setSim] = useState(loadSimulation)
   const [aboutOpen, setAboutOpen] = useState(false)
@@ -105,9 +104,11 @@ export default function App() {
   const nextMission = () => {
     const here = location
     setMission(null)
-    setPrediction({ earth: '', ship: '' })
     if (planet.id === here.id) {
-      const replacement = nearbyPlanets(here, 8).find((entry) => entry.id !== here.id)
+      // The next hop crosses to another host system, not a sibling world.
+      const replacement = nearbyPlanets(here, 12).find(
+        (entry) => entry.id !== here.id && entry.star !== here.star,
+      )
       if (replacement) setPlanet(replacement)
     }
     goTo('destination')
@@ -116,7 +117,6 @@ export default function App() {
   const goHome = () => {
     setLocation(EARTH)
     setMission(null)
-    setPrediction({ earth: '', ship: '' })
     if (planet.kind === 'earth') {
       const replacement = nearbyPlanets(EARTH, 8).find((entry) => entry.id !== EARTH.id)
       if (replacement) setPlanet(replacement)
@@ -178,6 +178,22 @@ export default function App() {
     setStepState('flight')
   }
 
+  // Travel Planner endpoints. The current location is the departure; changing
+  // either side leaves the rest of the mission state untouched.
+  const planChangeDeparture = (next) => {
+    if (!next) return
+    setLocation(next)
+  }
+
+  const planChangeDestination = (next) => {
+    if (!next) return
+    setPlanet(next)
+  }
+
+  const planReturnToEarth = () => {
+    if (location.id !== EARTH.id) setPlanet(EARTH)
+  }
+
   const backToSystem = (next) => {
     if (!next) return
     mapViewState.current.planetId = next.id
@@ -193,7 +209,6 @@ export default function App() {
     setLocation(EARTH)
     setPlanet(DEFAULT_PLANET)
     setMission(null)
-    setPrediction({ earth: '', ship: '' })
     goTo('destination')
   }
 
@@ -273,18 +288,19 @@ export default function App() {
         )}
 
         {step === 'flight' && (
-          <FlightPlan
+          <TravelPlanner
             origin={location}
-            planet={planet}
+            destination={planet}
             distanceLy={distanceLy}
             beta={beta}
             onBetaChange={setBeta}
             shipName={shipName}
             onShipNameChange={setShipName}
-            prediction={prediction}
-            onPredictionChange={setPrediction}
             onLaunch={launch}
-            onBack={() => goTo('destination')}
+            onChangeDeparture={planChangeDeparture}
+            onChangeDestination={planChangeDestination}
+            onReturnToEarth={planReturnToEarth}
+            onReturnToMap={backToUniverse}
           />
         )}
 
@@ -308,7 +324,6 @@ export default function App() {
             mission={mission}
             planet={planet}
             origin={location}
-            prediction={prediction}
             sim={sim}
             onNext={nextMission}
             onReset={reset}

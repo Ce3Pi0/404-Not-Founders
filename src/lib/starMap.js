@@ -39,6 +39,20 @@ export const BEYOND_REGION_COUNT = MAPPED_SYSTEMS.filter(
 /** Everything clickable on the map: the plotted stars plus the Solar origin. */
 export const PICK_TARGETS = [...REGION_SYSTEMS, SOLAR_SYSTEM]
 
+/**
+ * Every host star with a measured distance, drawn or not. The Travel Planner
+ * frames the whole route, so its endpoints may sit beyond the mapped region.
+ */
+export const MAPPED_ENTRIES = MAPPED_SYSTEMS.map(toEntry)
+
+/** Map entry for the host star of any planet, including beyond the region. */
+export function travelSystemFor(planet) {
+  if (!planet) return null
+  if (planet.kind === 'earth' || planet.star === 'Solar System') return SOLAR_SYSTEM
+  const system = SYSTEMS.get(planet.star)
+  return system?.mapPosition ? toEntry(system) : null
+}
+
 const BY_NAME = new Map(REGION_SYSTEMS.map((system) => [system.name, system]))
 
 /** Region entry for a host star, or the Solar System entry for Earth. */

@@ -17,14 +17,17 @@ Built by **404 Not Founders** for **Hack The Nest** — second playable draft.
 - **Skeletons** — past 85 years of accumulated time a figure renders as a full skeleton: cranium with
   orbits and teeth, vertebral column, ribcage with sternum, pelvis and two-bone limbs. The alien
   skeleton is anatomically different from the human one.
-- **Prepare** — set a cruise speed from 0.05 c to 0.999 c with a slider, numeric input and presets,
-  name the spacecraft, and predict both elapsed times before launch.
+- **Plan** — the Travel Planner keeps the 3D star map as its background: a glowing route between
+  two host stars, a spacecraft at the departure star carrying a 0.10 c–0.99 c speed slider (default
+  0.80 c), and the Lorentz factor, reference-frame time, ship time and aging difference updating as
+  the slider moves. Change either endpoint, return to Earth, or launch.
+
 - **Fly** — a top-down route view: origin marker, dotted route, ship on the line with live speed,
   distance travelled and remaining, two clocks advancing side by side, and the destination planet
   growing as the ship closes in.
 - **Go home** — a go-home button (header, planet view and debrief) always returns you to Earth.
 - **Learn** — a debrief with elapsed time in both frames, the γ factor, the substitution behind it,
-  prediction accuracy, the destination's surface-gravity clock rate, and a persistent mission log.
+  the destination's surface-gravity clock rate, and a persistent mission log.
 - **Age** — the crew, the Earth twin and the locals age through baby → toddler → child → teen →
   adult → elderly → skeleton as accumulated time crosses each threshold.
 - **3D star map** — every unique host-star system inside the nearest 150 light-years as a glowing
@@ -99,6 +102,30 @@ positions and capped at 12, because no 3D text library is installed.
 - Camera flights interpolate both position and target with an ease-in-out curve, and any manual
   input (drag, wheel, touch) cancels a flight immediately. Zooming the camera never changes the
   mission's current location.
+
+## Travel Planner
+
+`/travel` (`TravelPlanner`, `src/components/travel/SystemPickerDialog.jsx`) uses the same universe
+scene as the map. The departure and destination host stars are placed from their exact archive
+coordinates, a glowing path joins them, and the spacecraft sits at the departure point with the
+speed control attached to it.
+
+- **Distance** is the Euclidean separation of the two systems' NASA RA/Dec Cartesian vectors, in
+  light-years — never the subtraction of their catalogue distances.
+- **Speed** runs from 0.10 c to 0.99 c, default 0.80 c. The panel reports `γ = 1/√(1−β²)`,
+  reference-frame time `d/β`, spacecraft time `reference/γ`, and their difference immediately, so
+  every slider move updates the predicted clocks.
+- **Endpoints** start at the Solar System and the world selected on the map. **Change Departure** and
+  **Change Destination** search every host star with a measured distance, including stars beyond the
+  drawn 150-ly region; the camera reframes to the whole route. Clicking a charted star also sets the
+  destination.
+- **After arrival** the arrived system becomes the current location, so the next mission departs
+  from it; **Return to Earth** plans the trip home from wherever the crew is.
+- **Launch Spacecraft** keeps the existing journey and debrief, and **Return to Star Map** goes back
+  to the 3D map.
+- The model assumes a constant cruise speed, stationary endpoints in the chosen reference frame,
+  negligible acceleration, and no gravitational clock corrections during transit. The screen says
+  so; `/planet/:id` and the debrief carry the same note.
 
 ## Star System Explorer
 
@@ -194,7 +221,7 @@ planet, and keep changing the mission while it flies.
 
 ```
 src/
-  App.jsx                 mission state: route → flight plan → journey → debrief
+  App.jsx                 mission state: route → travel planner → journey → debrief
   data/exoplanets.csv     NASA Exoplanet Archive extract (6,442 planets)
   lib/catalog.js          CSV parsing, systems, 3D positions, route distances, search
   lib/physics.js          time dilation, gravity, formatting
@@ -209,7 +236,7 @@ src/
   lib/router.js           pathname routing for /system/:id, /planet/:id and /travel
   lib/glowTexture.js      shared star glow and halo sprites
   lib/webgl.js            one-time WebGL availability probe
-  components/             scene, crew figures, HUD, picker, flight plan, journey, debrief
+  components/             scene, crew figures, HUD, picker, travel planner, journey, debrief
   components/map/         3D universe map and the AU-scale Star System Explorer scene
   components/PlanetDetailView.jsx  /planet/:id record page and its portrait
   components/lab/         launch console: scene + camera rigs, controls, config, telemetry, education
