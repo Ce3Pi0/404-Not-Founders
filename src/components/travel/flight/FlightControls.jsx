@@ -46,6 +46,7 @@ export default function FlightControls({
   yearsPerSecond,
   originName,
   destinationName,
+  advanced,
 }) {
   const complete = progress >= 1
 
@@ -68,11 +69,30 @@ export default function FlightControls({
           <span className="truncate text-right">{destinationName}</span>
         </div>
         <div className="relative mt-1 h-1.5 overflow-hidden rounded-full bg-panel/70">
+          {advanced && (
+            <>
+              <div
+                className="absolute inset-y-0 left-0 bg-ion/30"
+                style={{ width: `${advanced.accelFraction * 100}%` }}
+              />
+              <div
+                className="absolute inset-y-0 right-0 bg-white/20"
+                style={{ width: `${(1 - advanced.brakeStartFraction) * 100}%` }}
+              />
+            </>
+          )}
           <div
-            className="h-full rounded-full bg-ion transition-[width] duration-100"
+            className="absolute inset-y-0 left-0 rounded-full bg-ion transition-[width] duration-100"
             style={{ width: `${progress * 100}%` }}
           />
         </div>
+        {advanced && (
+          <div className="mt-0.5 flex justify-between text-[8px] text-ink/35">
+            <span>Acceleration · {formatNumber(advanced.accelDistanceLy, 3)} ly</span>
+            <span>Cruise</span>
+            <span>Braking · {formatNumber(advanced.brakeDistanceLy, 3)} ly</span>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">

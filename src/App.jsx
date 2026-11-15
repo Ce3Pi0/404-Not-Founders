@@ -6,7 +6,6 @@ import TravelPlanner from './components/TravelPlanner'
 import LiveFlight from './components/travel/LiveFlight'
 import Debrief from './components/Debrief'
 import AboutDialog from './components/AboutDialog'
-import RelativityLab from './components/lab/RelativityLab'
 import StarMapView from './components/map/StarMapView'
 import SystemView from './components/map/SystemView'
 import PlanetDetailView from './components/PlanetDetailView'
@@ -22,7 +21,8 @@ import {
   usePathname,
 } from './lib/router'
 import { systemById, systemId } from './lib/starMap'
-import { simulateMission } from './lib/physics'
+import { missionPhysics, planMission, readPhysicsConfig } from './lib/mission'
+import { usePhysicsStore } from './store/physicsStore'
 import { emptySimulation, loadSimulation, recordMission, saveSimulation } from './lib/simulation'
 import { DEFAULT_PLANET, EARTH, distanceLyBetween, nearbyPlanets, planetById } from './lib/catalog'
 
@@ -86,9 +86,20 @@ export default function App() {
   }
 
   const launch = () => {
-    const result = simulateMission(distanceLy, beta)
+    const { advanced, config } = readPhysicsConfig()
+    const plan = planMission({
+      origin: location,
+      destination: planet,
+      distanceLy,
+      beta,
+      advanced,
+      config,
+    })
+    // An impossible launch never starts: the planner keeps the flight plan open
+    // with its feasibility warnings.
+    if (plan.mode === 'advanced' && plan.feasibility && !plan.feasibility.ok) return
     setMission({
-      ...result,
+      ...missionPhysics(plan),
       origin: location.name,
       originId: location.id,
       planet: planet.name,
@@ -109,6 +120,7 @@ export default function App() {
     if (!mission || recordedMission.current === mission.startedAt) return
     recordedMission.current = mission.startedAt
     setSim((current) => recordMission(current, mission))
+    usePhysicsStore.getState().recordResult(mission)
     setLocation(mission.destinationPlanet ?? planet)
   }
 
@@ -267,8 +279,11 @@ export default function App() {
         onGoHome={goHome}
         onAbout={() => setAboutOpen(true)}
         onReset={reset}
-        inLab={step === 'lab'}
-        onOpenLab={() => goTo(step === 'lab' ? 'destination' : 'lab')}
+        onSelectStep={(target) => {
+          // Journey and debrief only exist once a mission has launched.
+          if ((target === 'journey' || target === 'debrief') && !mission) return
+          goTo(target)
+        }}
         inMap={step === 'map'}
         onOpenMap={openMap}
       />
@@ -364,11 +379,8 @@ export default function App() {
             onExplore={exploreArrival}
             onChooseDestination={nextMission}
             onReturnToEarth={returnToEarthFromFlight}
+            onDebrief={() => goTo('debrief')}
           />
-        )}
-
-        {step === 'lab' && (
-          <RelativityLab shipName={shipName} onExit={() => goTo('destination')} />
         )}
 
         {step === 'debrief' && mission && (

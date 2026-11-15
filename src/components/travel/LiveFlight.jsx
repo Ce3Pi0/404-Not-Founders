@@ -4,8 +4,8 @@ import FlightHud from './flight/FlightHud'
 import FlightControls from './flight/FlightControls'
 import {
   FLIGHT_TIMELINE_SECONDS,
-  flightClock,
-  retardedProgress,
+  missionClock,
+  missionMotion,
   yearsPerPlaybackSecond,
 } from '../../lib/flight'
 import { layoutViews, viewsInclude } from '../../lib/flightViews'
@@ -24,6 +24,7 @@ function ArrivalPanel({
   onExplore,
   onChooseDestination,
   onReturnToEarth,
+  onDebrief,
 }) {
   const backToEarth = destination.kind !== 'earth'
   return (
@@ -37,7 +38,10 @@ function ArrivalPanel({
         </h2>
         <p className="mt-1 text-[11px] text-ink/60">
           {originEntry?.name ?? mission.origin} <span className="text-ink/35">→</span>{' '}
-          {destination.star} · {mission.shipName} at {mission.beta.toFixed(3)} c
+          {destination.star} · {mission.shipName}{' '}
+          {mission.mode === 'advanced'
+            ? `peaked at ${mission.beta.toFixed(3)} c and braked to rest`
+            : `at ${mission.beta.toFixed(3)} c`}
         </p>
 
         <div className="mt-3 grid grid-cols-3 gap-2 text-left">
@@ -60,7 +64,10 @@ function ArrivalPanel({
         </p>
 
         <div className="mt-3 flex flex-col gap-1.5">
-          <button type="button" className="btn btn-primary w-full py-2 text-[12px]" onClick={onExplore}>
+          <button type="button" className="btn btn-primary w-full py-2 text-[12px]" onClick={onDebrief}>
+            Open the debrief →
+          </button>
+          <button type="button" className="btn w-full py-2 text-[12px]" onClick={onExplore}>
             Explore This System
           </button>
           <button
@@ -102,6 +109,7 @@ export default function LiveFlight({
   onExplore,
   onChooseDestination,
   onReturnToEarth,
+  onDebrief,
 }) {
   const originEntry = useMemo(
     () => travelSystemFor(mission.originPlanet ?? origin),
@@ -217,8 +225,11 @@ export default function LiveFlight({
     })
   }
 
-  const clock = flightClock(mission, progress)
-  const delayedClock = flightClock(mission, retardedProgress(progress, mission.beta))
+  // One trajectory object feeds the picture and both clocks: the ship's
+  // position, the delayed-light marker and every readout come from it.
+  const motion = useMemo(() => missionMotion(mission), [mission])
+  const clock = missionClock(mission, progress)
+  const delayedClock = missionClock(mission, motion.retardedAt(progress))
   const delayYears = clock.earthYears - delayedClock.earthYears
   const yearsPerSecond = yearsPerPlaybackSecond(mission, rate)
   const status = arrived
@@ -249,8 +260,10 @@ export default function LiveFlight({
             <span className="num text-ink/90">
               {formatNumber(mission.distanceLy, mission.distanceLy < 1 ? 5 : 2)} ly
             </span>{' '}
-            · {mission.beta.toFixed(3)} c · {formatYears(mission.earthYears)} reference ·{' '}
-            {formatYears(mission.shipYears)} spacecraft
+            · {mission.beta.toFixed(3)} c{' '}
+            {mission.mode === 'advanced' ? '(peak)' : '(cruise)'} ·{' '}
+            {formatYears(mission.earthYears)} reference · {formatYears(mission.shipYears)}{' '}
+            spacecraft · {mission.mode === 'advanced' ? 'Advanced SR' : 'Simple SR'}
           </p>
         </div>
 
@@ -267,7 +280,7 @@ export default function LiveFlight({
               layout={layout}
               origin={originEntry}
               destination={destinationEntry}
-              beta={mission.beta}
+              motion={motion}
               progressRef={progressRef}
               delayed={delayed}
               clock={clock}
@@ -295,6 +308,7 @@ export default function LiveFlight({
                 onExplore={onExplore}
                 onChooseDestination={onChooseDestination}
                 onReturnToEarth={onReturnToEarth}
+                onDebrief={onDebrief}
               />
             )}
           </div>
@@ -321,6 +335,7 @@ export default function LiveFlight({
             yearsPerSecond={yearsPerSecond}
             originName={originName}
             destinationName={destinationName}
+            advanced={mission.mode === 'advanced' ? mission.advanced : null}
           />
         </div>
 

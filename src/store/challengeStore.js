@@ -11,6 +11,8 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { buildDirectReturnLeg, buildExpeditionRoute } from '../lib/challenge/route'
 import { clampBeta } from '../lib/challenge/physics'
+import { readPhysicsConfig } from '../lib/mission'
+import { usePhysicsStore } from './physicsStore'
 import {
   advanceExpedition,
   continueExpedition as continueEngine,
@@ -144,7 +146,11 @@ export const useChallengeStore = create(
       /** Build a fresh expedition from the current route and budgets. */
       launch() {
         const state = get()
-        const route = buildExpeditionRoute(state.planetIds, state.legSpeeds)
+        const { advanced, config } = readPhysicsConfig()
+        const route = buildExpeditionRoute(state.planetIds, state.legSpeeds, {
+          advanced,
+          config,
+        })
         if (!route.valid) return null
         const expedition = createExpedition({
           route,
@@ -202,6 +208,11 @@ export const useChallengeStore = create(
           departurePlanetId: expedition.currentLocation.planetId,
           index: expedition.currentLegIndex + 1,
           beta,
+          // A running expedition keeps the physics mode it launched with.
+          options:
+            expedition.route.physicsMode === 'advanced'
+              ? { advanced: true, config: expedition.route.advancedConfig }
+              : {},
         })
         if (!leg) return
         set({ expedition: insertFinalLeg(expedition, leg) })
@@ -270,7 +281,12 @@ export const useChallengeStore = create(
 export function useChallengeRoute() {
   const planetIds = useChallengeStore((state) => state.planetIds)
   const legSpeeds = useChallengeStore((state) => state.legSpeeds)
-  return useMemo(() => buildExpeditionRoute(planetIds, legSpeeds), [planetIds, legSpeeds])
+  const advanced = usePhysicsStore((state) => state.advanced)
+  const config = usePhysicsStore((state) => state.config)
+  return useMemo(
+    () => buildExpeditionRoute(planetIds, legSpeeds, { advanced, config }),
+    [planetIds, legSpeeds, advanced, config],
+  )
 }
 
 /** The active expedition, if any. */

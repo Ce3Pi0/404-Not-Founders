@@ -45,10 +45,13 @@ Built by **404 Not Founders** for **Hack The Nest** — second playable draft.
   planetary scene in AU: every known world on its archive semi-major axis, orbit rates from the
   archive period, click-to-select with a camera flight, orbit and label toggles, and an adjustable
   simulation clock. Systems are generated from the archive rows, never hardcoded.
-- **Relativity Lab** — a flight console with four camera perspectives (first-, second- and
-  third-person, plus a bird's-eye system map), a synchronized Point A / Point B split screen, live
-  digital clocks, spacecraft and G-force telemetry, and full start / pause / resume / reset control
-  over a segmented acceleration–cruise–deceleration flight.
+- **Two Special-Relativity modes** — the Flight Plan carries an *Advanced Acceleration* switch.
+  Off (the default) is **Simple SR**: instantaneous acceleration, constant cruise, instantaneous
+  braking. On is **Advanced SR**: finite acceleration at a constant proper acceleration, a cruise
+  phase when the distance allows, and automatic braking to rest at the destination — with the
+  proper acceleration, spacecraft mass, carried propellant and engine thrust used as launch and
+  thrust feasibility checks. The selected mode and parameters persist across Route, Flight Plan,
+  Live Flight, Debrief and the Expedition Challenge.
 
 ## Run it
 
@@ -230,44 +233,46 @@ Surface gravity is computed as `g = M/R²` in Earth units, and the gravitational
 `√(1 − rₛ/R)` is shown for context — at these masses it is many orders of magnitude smaller than the
 velocity effect.
 
-Simplifications for this draft: one-way legs at constant velocity (no acceleration or braking), no
-orbital motion, no gravitational lensing. Speeds and mission profiles are hypothetical; the
-destinations are real.
+Simplifications: no orbital motion and no gravitational lensing. Speeds and mission profiles are
+hypothetical; the destinations are real. Simple SR treats acceleration and braking as
+instantaneous; Advanced SR gives them their real duration and distance (see below).
 
-## Relativity Lab model
+## Two Special-Relativity modes
 
-The lab is an interactive launch simulation. You configure a craft, launch it from a
-planet, and keep changing the mission while it flies.
+Both modes share one physics service (`src/lib/advancedSR.js` + `src/lib/mission.js`), so the
+Flight Plan preview, the flight animation, the clocks and the Debrief all read the same numbers.
 
-- **The integrator.** State is advanced step by step in the shared rest frame of the two
-  stations. While the ship thrusts, velocity is integrated in rapidity space, which is exact
-  for a constant proper acceleration over a step:
-  `η₁ = asinh(sinh η₀ + a·dt/c)`, `β = tanh η`, `Δτ = (c/a)(η₁ − η₀)`.
-  Nothing is prerecorded: thrust, mass, fuel, target speed, course and the arrival burn all
-  change the trajectory the next frame.
-- **Ascent.** Newtonian climb at the chosen launch angle through a 100 km atmosphere:
-  `dv/dt = a_thrust − g(r)·sin θ`, with `g(r) = g₀(R/r)²` from the planet's mass and radius.
-  Below the surface gravity the craft is held on the pad with an explanation instead of
-  silently failing.
-- **Fuel.** A photon drive (`Isp = c/g₀`), so the burn rate is `thrust/c`; the propellant
-  load caps the total burn time. Running dry shuts the engines down and the ship coasts.
-- **Clocks.** The ship's proper time is integrated along the path actually flown:
-  `dτ = dt · √(1 − v²/c²) · √(1 − rₛ/r)`, with the gravitational factor taken from the launch
-  planet's potential while the ship climbs out of it and 1 in deep space. The launch planet
-  and destination clocks advance at their own surface rates. G-force is proper acceleration
-  ÷ 9.80665 m/s² and never enters the time-dilation integral on its own, so a ship coasting at
-  0.74 c reads 0 g while its clock still runs slow.
-- **Arrival burn.** With auto-brake on, the ship flips when the remaining distance equals the
-  relativistic stopping distance `(c²/a)(cosh η − 1)` and decelerates into the destination.
-- **Cameras.** One scene, four synchronized rigs — first-person cockpit, tracking observer,
-  chase view with adjustable distance and angle, and a top-down system map you can orbit and
-  zoom. Split-screen shows Point A and Point B side by side, each with its own camera and its
-  own clock, from the same simulation state.
-- **Simplifications, labelled in the app:** a 100 km atmospheric shell, a fixed ship mass, no
-  destination gravity well, no orbital motion and no tidal effects. Playback compresses the
-  mission timeline (the ascent runs in seconds, the interstellar leg in years) without
-  changing the physics, and route length is still the radial separation of the two catalog
-  distances from Earth.
+- **Simple SR — constant velocity (default).** `beta = v/c`, `gamma = 1/sqrt(1 - beta^2)`,
+  `earthTime = d / (beta*c)` and `shipTime = earthTime / gamma`. Acceleration and braking have
+  zero simulated duration. Normalised burn energy stays `2*(gamma - 1)`.
+- **Advanced SR — acceleration + cruise + braking.** One constant proper acceleration `a` for
+  both burns. From rest to `beta`:
+
+  ```
+  t_acc   = (c/a) * beta * gamma          tau_acc = (c/a) * atanh(beta)
+  d_acc   = (c^2/a) * (gamma - 1)         d_brake = d_acc, tau_brake = tau_acc
+  ```
+
+  If `d_acc + d_brake > D` the target speed is unreachable: the ship flies one symmetric arc
+  with `gamma_peak = 1 + D*a/(2c^2)`, the cruise distance is exactly zero, and the interface
+  reports the peak speed it will actually reach. No negative cruise distance is ever produced.
+- **Trajectory and clocks.** The animation is driven by the same trajectory function as the
+  clocks, via the relativistic rocket equations — `v(tau) = c*tanh(a*tau/c)`,
+  `t(tau) = (c/a)*sinh(a*tau/c)`, `x(tau) = (c^2/a)*(cosh(a*tau/c) - 1)` — never `v = a*t`.
+  Proper time is integrated through every phase, so the crew clock is not one cruise `gamma`
+  applied to the whole trip. Earth-reference progress drives the timeline, so acceleration and
+  braking take their real share of the voyage.
+- **Launch and thrust feasibility.** `a_max = thrust / (dryMass + propellant)` and, for a
+  surface departure, `requestedAcceleration > surfaceGravity` (measured mass and radius only;
+  Earth uses the reference constants). The launch is refused with an explanation when either
+  fails — a configuration problem, never an expedition-budget failure.
+- **Not modelled:** gravitational time dilation, spacetime curvature, general relativity,
+  atmospheric drag, fuel burn, changing vehicle mass and relativistic exhaust velocity. The
+  interface says so in its "Physics assumptions" panel.
+
+The Expedition Challenge reuses the same engine per leg: each leg gets its own accelerate /
+cruise / brake solution, its attained peak speed, and `2*(gamma_peak - 1)` of normalised burn
+energy plus the separate Newtonian escape energy. Budgets still fail only during execution.
 
 ## Project structure
 
@@ -277,13 +282,12 @@ src/
   data/exoplanets.csv     NASA Exoplanet Archive extract (6,442 planets)
   lib/catalog.js          CSV parsing, systems, 3D positions, route distances, search
   lib/physics.js          time dilation, gravity, formatting
-  lib/flight.js           Live Flight progress clocks, playback rate, retarded-signal progress
+  lib/advancedSR.js       advanced-SR trajectory, clocks, energy and launch feasibility
+  lib/mission.js          route + mode -> mission (shared by preview, launch and challenge)
+  lib/flight.js           Live Flight clocks per mode, playback rate, retarded-signal progress
   lib/planet.js           classification, palettes, procedural textures, star colour
   lib/aging.js            biological stages
   lib/simulation.js       localStorage mission log
-  lib/labPhysics.js       relativistic helpers, clock formatting, planet frames
-  lib/launchPhysics.js    launch integrator: thrust, fuel, phases, proper time, telemetry
-  lib/labCatalog.js       lab stations (Earth + archive worlds) and route distances
   lib/starMap.js          map-frame entries, 150 ly region, search, labels, exact map distances
   lib/planetSystem.js     local AU-scale system model: orbits, phases, sizes, camera framing
   lib/router.js           pathname routing for /system/:id, /planet/:id and /travel
@@ -294,7 +298,7 @@ src/
   components/travel/flight/  Live Flight multi-camera stage, view panels, HUD and camera maths
   components/map/         3D universe map and the AU-scale Star System Explorer scene
   components/PlanetDetailView.jsx  /planet/:id record page and its portrait
-  components/lab/         launch console: scene + camera rigs, controls, config, telemetry, education
+  components/lab/Spacecraft.jsx   procedural ship used by the flight scenes
 ```
 
 ## Roadmap

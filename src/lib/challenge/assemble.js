@@ -17,6 +17,7 @@ import {
   legTravelTimes,
   propulsionEnergy,
 } from './physics.js'
+import { advancedJourney } from '../advancedSR.js'
 
 export const EARTH_SYSTEM = 'Solar System'
 export const DEFAULT_OUTBOUND_BETA = 0.6
@@ -39,14 +40,45 @@ export function systemDistanceLy(a, b) {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
 }
 
-function completeLeg(leg, beta) {
+function completeLeg(leg, beta, advanced) {
   const speed = clampBeta(beta)
+
+  // Advanced SR: the leg's clocks are the accelerate–cruise–brake solution, and
+  // the normalised burn energy uses the actual peak Lorentz factor (which is
+  // lower than the requested one when the distance is too short to reach it).
+  if (advanced?.enabled) {
+    const model = advancedJourney({
+      distanceLy: leg.distanceLy,
+      beta: speed,
+      accelMs: advanced.accelMs,
+    })
+    if (model) {
+      const perBurn = model.gammaPeak - 1
+      return {
+        ...leg,
+        beta: speed,
+        betaPeak: model.betaPeak,
+        gamma: model.gammaPeak,
+        accelerationCost: perBurn,
+        brakingCost: perBurn,
+        propulsionCost: perBurn * 2,
+        totalEnergyCost: leg.gravityCost + perBurn * 2,
+        earthYears: model.earthYears,
+        shipYears: model.shipYears,
+        driftYears: model.driftYears,
+        physicsMode: 'advanced',
+        advanced: model,
+      }
+    }
+  }
+
   const times = legTravelTimes(leg.distanceLy, speed)
   const accel = accelerationEnergy(speed)
   const brake = brakingEnergy(speed)
   return {
     ...leg,
     beta: speed,
+    betaPeak: speed,
     gamma: times.gamma,
     accelerationCost: accel,
     brakingCost: brake,
@@ -55,7 +87,14 @@ function completeLeg(leg, beta) {
     earthYears: times.earthYears,
     shipYears: times.shipYears,
     driftYears: times.driftYears,
+    physicsMode: 'simple',
   }
+}
+
+/** Options → the advanced-SR settings completeLeg needs, or null. */
+function advancedOptions(options = {}) {
+  if (!options.advanced) return null
+  return { enabled: true, accelMs: Number(options.config?.accelMs) || 9.81 }
 }
 
 function makeLeg({ index, fromSystem, toSystem, fromPosition, toPosition, departureBody, stop }) {
@@ -84,9 +123,10 @@ function makeLeg({ index, fromSystem, toSystem, fromPosition, toPosition, depart
  * Stops in visit order. Each stop is
  * `{ systemName, position:[x,y,z], planetIds, planetNames, landingPlanet }`.
  */
-export function assembleExpedition(stops = [], legSpeeds = {}) {
+export function assembleExpedition(stops = [], legSpeeds = {}, options = {}) {
   const legCount = stops.length + 1
   const legs = []
+  const advanced = advancedOptions(options)
 
   for (let index = 0; index < legCount; index += 1) {
     const fromSystem = index === 0 ? EARTH_SYSTEM : stops[index - 1].systemName
@@ -107,7 +147,7 @@ export function assembleExpedition(stops = [], legSpeeds = {}) {
       stop,
     })
     const defaultBeta = index === legCount - 1 ? DEFAULT_RETURN_BETA : DEFAULT_OUTBOUND_BETA
-    legs.push(completeLeg(leg, legSpeeds[leg.key] ?? defaultBeta))
+    legs.push(completeLeg(leg, legSpeeds[leg.key] ?? defaultBeta, advanced))
   }
 
   const plannedSurveys = stops.reduce((sum, stop) => sum + stop.planetIds.length, 0)
@@ -130,6 +170,8 @@ export function assembleExpedition(stops = [], legSpeeds = {}) {
     totalDistanceLy: sum((leg) => leg.distanceLy),
     valid: stops.length > 0 && legs.length === stops.length + 1,
     betaRange: [0.1, 0.99],
+    physicsMode: advanced ? 'advanced' : 'simple',
+    advancedConfig: advanced ? { accelMs: advanced.accelMs } : null,
   }
 }
 
@@ -141,6 +183,7 @@ export function assembleDirectReturnLeg({
   index,
   beta,
   key,
+  options = {},
 }) {
   const leg = makeLeg({
     index,
@@ -151,7 +194,7 @@ export function assembleDirectReturnLeg({
     departureBody: departurePlanet,
     stop: null,
   })
-  return completeLeg(leg, beta)
+  return completeLeg(leg, beta, advancedOptions(options))
 }
 
 /** Group an ordered planet list into consecutive same-system stops. */

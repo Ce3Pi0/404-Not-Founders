@@ -181,8 +181,9 @@ export default function FlightViewport({
             >
               Light leaving the ship needs time to reach the departure system, so the image arriving
               there shows where the ship was, not where it is. The white marker sits at the retarded
-              position from the mission's own flight time: <em>p / (1 + β)</em>, solved from the
-              light-travel equation — not an illustrative guess.
+              position solved from the light-travel equation — <em>p / (1 + β)</em> at constant
+              speed, or a numerical solve of the actual trajectory in Advanced SR — never an
+              illustrative guess.
             </InfoTip>
           )}
         </div>
