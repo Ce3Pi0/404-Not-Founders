@@ -1191,7 +1191,7 @@ function SceneRig({
       <ambientLight intensity={0.8} />
       <StarField glow={glow} />
       {showGrid && <ReferenceGrid glow={glow} />}
-      <DepthStems systems={systems} />
+      {showGrid && <DepthStems systems={systems} />}
       <HostStars systems={systems} glow={glow} />
       <MarkerPoints entries={hoveredEntries} glow={glow} color="#ffd27a" size={14} />
       <MarkerPoints entries={selectedEntries} glow={glow} color={CYAN} size={16} />
