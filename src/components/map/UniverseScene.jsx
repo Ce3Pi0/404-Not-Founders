@@ -8,6 +8,20 @@ import { SOLAR_SYSTEM } from '../../lib/starMap'
 const HOME_CAMERA = [18, 12, 26]
 const HOME_TARGET = [0, 0, 0]
 
+/** A blank panel is worse than a message: check once whether a 3D view is possible. */
+const HAS_WEBGL = (() => {
+  try {
+    const probe = document.createElement('canvas')
+    const context = probe.getContext('webgl2') ?? probe.getContext('webgl')
+    if (!context) return false
+    // Release the probe context so it never counts against the browser's limit.
+    context.getExtension('WEBGL_lose_context')?.loseContext()
+    return true
+  } catch {
+    return false
+  }
+})()
+
 /* --------------------------------------------------------------- textures -- */
 
 /** Soft radial sprite so every host star reads as a glowing point. */
@@ -416,6 +430,18 @@ export default function UniverseScene({
   onHover,
 }) {
   const glow = useGlowTexture()
+
+  if (!HAS_WEBGL) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-void p-6 text-center">
+        <div className="text-[11px] tracking-[0.18em] text-ink/45 uppercase">Universe map</div>
+        <p className="max-w-[280px] text-[12px] leading-relaxed text-ink/70">
+          This browser could not start WebGL, so the 3D map cannot draw. Enable hardware
+          acceleration and reload to fly the region.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <Canvas

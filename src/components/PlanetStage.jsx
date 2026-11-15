@@ -11,6 +11,7 @@ import {
   mulberry32,
   hashString,
 } from '../lib/planet'
+import { getEarthTextures, EARTH_ATMOSPHERE } from '../lib/earthTexture'
 import { describeAge } from '../lib/aging'
 import { formatNumber } from '../lib/physics'
 import BobbleFigure from './BobbleFigure'
@@ -24,17 +25,24 @@ const UP = new THREE.Vector3(0, 1, 0)
 const CREW_SCALE = 0.07
 
 function PlanetMesh({ planet, earthYears, alienYears }) {
+  const isEarth = planet.kind === 'earth'
   const { texture, look } = useMemo(() => createPlanetTexture(planet), [planet])
+  // Earth is the one world with a known surface: real continents and a cloud
+  // shell instead of an inferred palette.
+  const earth = useMemo(() => (isEarth ? getEarthTextures() : null), [isEarth])
   const tilt = useMemo(() => {
+    if (isEarth) return 0.409 // 23.4° axial tilt
     const rand = mulberry32(hashString(planet.name))
     return rand() * 0.5 - 0.25
-  }, [planet.name])
+  }, [isEarth, planet.name])
   const spin = useRef()
+  const clouds = useRef()
 
   useEffect(() => () => texture.dispose(), [texture])
 
   useFrame((_, delta) => {
     if (spin.current) spin.current.rotation.y += delta * 0.02
+    if (clouds.current) clouds.current.rotation.y += delta * 0.028
   })
 
   return (
@@ -42,16 +50,72 @@ function PlanetMesh({ planet, earthYears, alienYears }) {
       <group ref={spin}>
         <mesh>
           <sphereGeometry args={[1, 96, 96]} />
-          <meshStandardMaterial map={texture} roughness={0.9} metalness={0.03} />
+          <meshStandardMaterial
+            map={earth ? earth.surface : texture}
+            roughness={earth ? 0.78 : 0.9}
+            metalness={earth ? 0.02 : 0.03}
+          />
         </mesh>
         <SurfaceCrew planet={planet} look={look} earthYears={earthYears} alienYears={alienYears} />
       </group>
-      <Atmosphere color={look.atmosphere} />
+      {earth && (
+        <mesh ref={clouds} scale={1.006}>
+          <sphereGeometry args={[1, 96, 96]} />
+          <meshStandardMaterial
+            map={earth.clouds}
+            transparent
+            opacity={0.85}
+            roughness={1}
+            metalness={0}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+      <Atmosphere color={earth ? EARTH_ATMOSPHERE : look.atmosphere} rim={isEarth} />
     </group>
   )
 }
 
-function Atmosphere({ color }) {
+/**
+ * Atmospheric glow. Earth keeps the soft rim shader that reads as a real
+ * planet limb; the inferred worlds use the flat shell.
+ */
+function Atmosphere({ color, rim = false }) {
+  const uniforms = useMemo(() => ({ uColor: { value: new THREE.Color(color) } }), [color])
+
+  if (rim) {
+    return (
+      <mesh scale={1.045}>
+        <sphereGeometry args={[1, 64, 64]} />
+        <shaderMaterial
+          uniforms={uniforms}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          vertexShader={`
+            varying vec3 vNormal;
+            varying vec3 vView;
+            void main() {
+              vec4 mv = modelViewMatrix * vec4(position, 1.0);
+              vNormal = normalize(normalMatrix * normal);
+              vView = normalize(-mv.xyz);
+              gl_Position = projectionMatrix * mv;
+            }
+          `}
+          fragmentShader={`
+            uniform vec3 uColor;
+            varying vec3 vNormal;
+            varying vec3 vView;
+            void main() {
+              float rim = 1.0 - max(dot(normalize(vNormal), normalize(vView)), 0.0);
+              gl_FragColor = vec4(uColor, pow(rim, 2.6) * 0.85);
+            }
+          `}
+        />
+      </mesh>
+    )
+  }
+
   return (
     <mesh scale={1.03}>
       <sphereGeometry args={[1, 48, 48]} />
