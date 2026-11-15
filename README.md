@@ -102,11 +102,13 @@ higher-priority one is dropped instead of stacked (`pickVisibleLabels` in `lib/m
 
 - **Solar System.** A small Sun-coloured star marker at the origin with a thin warm outline and the
   label `Solar System — Home`. Its on-screen size is held constant by the camera (about the size of
-  a catalogue marker), so it never implies an astronomical diameter of light-years. No sphere, no
-  bloom and no Earth orbit are drawn at this scale.
-- **Depth.** Star points take the host star's blackbody colour and shrink with distance from the
-  camera; thin rings at 5/10/25/50/100 ly on the reference plane, faint radial spokes and vertical
-  stems from nearby systems down to that plane give the cloud a measured volume.
+  a catalogue marker), so it never implies an astronomical diameter of light-years. Its core keeps
+  the Sun's own warm gold rather than white. No sphere and no Earth orbit are drawn at this scale.
+- **Star points.** Each host star takes its blackbody colour and a crisp core (the soft sprite is
+  left as a glow), so a marker stays a point you can aim at at any zoom.
+- **Depth.** Thin rings at 5/10/25/50/100 ly on the reference plane, faint radial spokes and
+  vertical stems from nearby systems down to that plane give the cloud a measured volume. All of
+  them are off by default and belong to the **Grid** toggle, so the opening map is stars only.
 - **Home framing.** `HOME_CAMERA` in `lib/mapCamera.js` is oblique and ~17 ly out, so the nearest
   catalogue systems separate into real empty space instead of collapsing onto the Sun.
 - **Route.** The planner's route is drawn as a thin cyan path with a ring at each end and its
@@ -121,8 +123,9 @@ higher-priority one is dropped instead of stacked (`pickVisibleLabels` in `lib/m
   from the current location, its known exoplanets, **Explore System** and **Plan Travel**. Clicking
   blank space clears the selection. The navigation rail on the left stays compact (search, current
   location, destination with distance, system count) so the map keeps most of the viewport.
-- **Double-clicking** a star dives into it: the Solar System hands over to the Earth orbit scene, an
-  exoplanet host opens its local system explorer (`/system/:id`, AU scale). The same dive also runs
+- **Double-clicking** a star dives into it: the Solar System hands over to the home scene (the Solar
+  System close-up with Earth marked as home), an exoplanet host opens its local system explorer
+  (`/system/:id`, AU scale). The same dive also runs
   when a pointer leaves the map through the solar marker while zooming in.
 - The search field matches host stars and individual planets straight from the archive extract,
   limited to the drawn region so every hit has a real position to fly to.

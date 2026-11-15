@@ -296,7 +296,7 @@ function SunMarker({ glow, ring }) {
       <sprite ref={halo}>
         <spriteMaterial
           map={glow}
-          color="#fff1cf"
+          color="#ffb765"
           transparent
           opacity={0.55}
           depthWrite={false}
@@ -306,7 +306,7 @@ function SunMarker({ glow, ring }) {
       <sprite ref={core}>
         <spriteMaterial
           map={glow}
-          color="#fffaf0"
+          color="#ffe3a3"
           transparent
           opacity={0.95}
           depthWrite={false}
