@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Header from './components/Header'
 import DestinationPicker from './components/DestinationPicker'
 import PlanetStage from './components/PlanetStage'
@@ -8,13 +8,17 @@ import Debrief from './components/Debrief'
 import AboutDialog from './components/AboutDialog'
 import RelativityLab from './components/lab/RelativityLab'
 import StarMapView from './components/map/StarMapView'
+import SystemView from './components/map/SystemView'
+import { navigate, systemIdFromPath, usePathname } from './lib/router'
+import { systemById, systemId } from './lib/starMap'
 import { simulateMission } from './lib/physics'
 import { emptySimulation, loadSimulation, recordMission, saveSimulation } from './lib/simulation'
 import { DEFAULT_PLANET, EARTH, distanceLyBetween, nearbyPlanets } from './lib/catalog'
 
 
 export default function App() {
-  const [step, setStep] = useState('destination')
+  const pathname = usePathname()
+  const [step, setStep] = useState(() => (systemIdFromPath(window.location.pathname) ? 'map' : 'destination'))
   const [location, setLocation] = useState(EARTH)
   const [planet, setPlanet] = useState(DEFAULT_PLANET)
   const [beta, setBeta] = useState(0.9)
@@ -23,12 +27,24 @@ export default function App() {
   const [mission, setMission] = useState(null)
   const [sim, setSim] = useState(loadSimulation)
   const [aboutOpen, setAboutOpen] = useState(false)
+  // Selected star + camera framing survive a trip to /system/:id and back.
+  const mapViewState = useRef({
+    selected: null,
+    planetId: null,
+    camera: { position: null, target: null },
+  })
 
   const distanceLy = distanceLyBetween(location, planet)
+  const routeSystem = systemById(systemIdFromPath(pathname))
 
   useEffect(() => {
     saveSimulation(sim)
   }, [sim])
+
+  // Leaving the map drops its system URL so reopening starts at the universe.
+  useEffect(() => {
+    if (step !== 'map' && systemIdFromPath(pathname)) navigate('/')
+  }, [step, pathname])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -82,6 +98,7 @@ export default function App() {
   const mapSetDestination = (next) => {
     if (!next || next.id === location.id) return
     setPlanet(next)
+    navigate('/')
     setStep('destination')
   }
 
@@ -92,7 +109,24 @@ export default function App() {
       const replacement = nearbyPlanets(next, 6).find((entry) => entry.id !== next.id)
       if (replacement) setPlanet(replacement)
     }
+    navigate('/')
     setStep('destination')
+  }
+
+  const openMap = () => {
+    if (step === 'map') {
+      navigate('/')
+      setStep('destination')
+      return
+    }
+    navigate('/')
+    setStep('map')
+  }
+
+  const exploreSystem = (entry) => {
+    if (!entry) return
+    setStep('map')
+    navigate(`/system/${systemId(entry)}`)
   }
 
   const reset = () => {
@@ -119,7 +153,7 @@ export default function App() {
         inLab={step === 'lab'}
         onOpenLab={() => setStep(step === 'lab' ? 'destination' : 'lab')}
         inMap={step === 'map'}
-        onOpenMap={() => setStep(step === 'map' ? 'destination' : 'map')}
+        onOpenMap={openMap}
       />
 
       <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-4 lg:px-8 lg:py-6">
@@ -146,15 +180,29 @@ export default function App() {
           </div>
         )}
 
-        {step === 'map' && (
-          <StarMapView
-            origin={location}
-            planet={planet}
-            onSetDestination={mapSetDestination}
-            onSetOrigin={mapSetOrigin}
-            onExit={() => setStep('destination')}
-          />
-        )}
+        {step === 'map' &&
+          (routeSystem ? (
+            <SystemView
+              entry={routeSystem}
+              origin={location}
+              initialPlanetId={mapViewState.current.planetId}
+              onBack={() => navigate('/')}
+              onSetDestination={mapSetDestination}
+            />
+          ) : (
+            <StarMapView
+              origin={location}
+              planet={planet}
+              viewState={mapViewState}
+              onSetDestination={mapSetDestination}
+              onSetOrigin={mapSetOrigin}
+              onExplore={exploreSystem}
+              onExit={() => {
+                navigate('/')
+                setStep('destination')
+              }}
+            />
+          ))}
 
         {step === 'flight' && (
           <FlightPlan

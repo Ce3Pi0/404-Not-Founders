@@ -81,6 +81,21 @@ left out of the map (their `mapPosition` is `null`) but remain searchable and ro
 beyond the region are counted in the map overlay. Names are HTML labels projected from the 3D
 positions and capped at 12, because no 3D text library is installed.
 
+### Selecting and navigating
+
+- Hovering a point raises its glow and shows the system's name; clicking it opens a floating card
+  with the host star, its distance from the current location, its known exoplanets, **Explore
+  System** and **Plan Travel**. Clicking blank space clears the selection.
+- The search field matches host stars and individual planets straight from the archive extract,
+  limited to the drawn region so every hit has a real position to fly to.
+- Selecting a result eases the camera to that system's exact 3D point. **Explore System** glides in
+  and opens `/system/:id`; **← Back to Universe** returns with the same star selected and the camera
+  framing restored (`SystemView`, `src/lib/router.js`). The selected star carries a cyan halo and a
+  dashed distance line to the current location.
+- Camera flights interpolate both position and target with an ease-in-out curve, and any manual
+  input (drag, wheel, touch) cancels a flight immediately. Zooming the camera never changes the
+  mission's current location.
+
 ## Theme
 
 The interface uses only `#9A0680`, `#79018C`, `#4C0070` and `#160040`, with no gradients anywhere —
@@ -153,9 +168,10 @@ src/
   lib/labPhysics.js       relativistic helpers, clock formatting, planet frames
   lib/launchPhysics.js    launch integrator: thrust, fuel, phases, proper time, telemetry
   lib/labCatalog.js       lab stations (Earth + archive worlds) and route distances
-  lib/starMap.js          map-frame entries, 150 ly region, label selection, exact map distances
+  lib/starMap.js          map-frame entries, 150 ly region, search, labels, exact map distances
+  lib/router.js           pathname routing for /system/:id
   components/             scene, crew figures, HUD, picker, flight plan, journey, debrief
-  components/map/         3D universe map: scene, labels, system panel, orientation gizmo
+  components/map/         3D universe map: scene, labels, search, system card and page, gizmo
   components/lab/         launch console: scene + camera rigs, controls, config, telemetry, education
 ```
 

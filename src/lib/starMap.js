@@ -48,6 +48,67 @@ export function mapSystemFor(planet) {
   return BY_NAME.get(planet.star) ?? null
 }
 
+/** Entry for a remembered system name (selection survives leaving the map). */
+export function mapSystemNamed(name) {
+  if (!name) return null
+  if (entryIsSolar({ name })) return SOLAR_SYSTEM
+  return BY_NAME.get(name) ?? null
+}
+
+/** Stable URL id for a host-star system, used by `/system/:id`. */
+export function systemId(system) {
+  return (system?.name ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+const BY_SYSTEM_ID = new Map(
+  [...SYSTEMS.values()].map((system) => [systemId(system), system]),
+)
+
+/** Catalogue system for a `/system/:id` route — mapped or not. */
+export function systemById(id) {
+  if (!id) return null
+  return BY_SYSTEM_ID.get(id) ?? null
+}
+
+/**
+ * Search index over the drawn region: every host star and every planet the
+ * map can actually fly to. Names come straight from the NASA archive extract.
+ */
+const MAP_SEARCH = [
+  ...REGION_SYSTEMS,
+  SOLAR_SYSTEM,
+].flatMap((system) => [
+  { type: 'system', system, planet: null, name: system.name, needle: system.name.toLowerCase() },
+  ...system.planets
+    .filter((planet) => planet.kind !== 'earth')
+    .map((planet) => ({
+      type: 'planet',
+      system,
+      planet,
+      name: planet.name,
+      needle: planet.name.toLowerCase(),
+    })),
+])
+
+/** Matching host stars and worlds, closest name match first. */
+export function searchMap(query, limit = 8) {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return []
+  const starts = []
+  const contains = []
+  for (const entry of MAP_SEARCH) {
+    if (entry.needle.startsWith(needle)) starts.push(entry)
+    else if (entry.needle.includes(needle)) contains.push(entry)
+  }
+  const rank = (entry) => (entry.type === 'system' ? 0 : 1)
+  return [...starts, ...contains]
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
+    .slice(0, limit)
+}
+
 /** Exact 3D separation in light-years between two map entries. */
 export function mapDistanceLy(a, b) {
   if (!a || !b) return null

@@ -12,8 +12,8 @@ function Row({ label, value }) {
 }
 
 /**
- * Details for one host-star system. Everything numeric comes from the exact
- * catalogue coordinates, never from the drawn scene positions.
+ * Floating card for one host-star system. Everything numeric comes from the
+ * exact catalogue coordinates, never from the drawn scene positions.
  */
 export default function SystemPanel({
   entry,
@@ -23,11 +23,14 @@ export default function SystemPanel({
   onPickPlanet,
   onSetDestination,
   onSetOrigin,
+  onExplore,
   onClose,
 }) {
   const solar = entryIsSolar(entry)
   const fromHere = mapDistanceLy(entry, originEntry)
-  const coords = entry.mapPosition.map((value) => formatNumber(value, 2)).join(', ')
+  const coords = entry.mapPosition
+    ? entry.mapPosition.map((value) => formatNumber(value, 2)).join(', ')
+    : null
   const atOrigin = Boolean(activePlanet && originPlanet && activePlanet.id === originPlanet.id)
 
   return (
@@ -46,7 +49,7 @@ export default function SystemPanel({
           type="button"
           className="btn shrink-0 px-2 py-1 text-[11px]"
           onClick={onClose}
-          aria-label="Close system details"
+          aria-label="Clear selection"
         >
           ×
         </button>
@@ -54,24 +57,29 @@ export default function SystemPanel({
 
       <div className="space-y-1.5 rounded-xl border border-line/50 bg-void/50 px-3 py-2.5">
         <Row
-          label="From Earth"
-          value={solar ? 'origin' : `${formatNumber(entry.distanceLy, 3)} ly`}
-        />
-        <Row
-          label="From here"
+          label={`From ${originEntry?.name ?? 'current location'}`}
           value={fromHere == null ? '—' : `${formatNumber(fromHere, 3)} ly`}
         />
-        <Row label="RA / Dec" value={`${formatNumber(entry.ra, 2)}° / ${formatNumber(entry.dec, 2)}°`} />
-        <Row label="Map x, y, z" value={`${coords} ly`} />
-        <Row label="Worlds" value={`${entry.planets.length}`} />
+        <Row label="Known worlds" value={`${entry.planets.length}`} />
+        {!solar && (
+          <Row
+            label="From Earth"
+            value={`${formatNumber(entry.distanceLy, 3)} ly`}
+          />
+        )}
+        <Row
+          label="RA / Dec"
+          value={`${formatNumber(entry.ra, 2)}° / ${formatNumber(entry.dec, 2)}°`}
+        />
+        <Row label="Map x, y, z" value={coords ? `${coords} ly` : 'not plotted'} />
       </div>
 
       <div>
         <div className="mb-1.5 flex items-baseline justify-between">
-          <span className="text-[9px] tracking-[0.16em] text-ink/45 uppercase">Worlds</span>
-          <span className="text-[9px] text-ink/40">select one to route</span>
+          <span className="text-[9px] tracking-[0.16em] text-ink/45 uppercase">Exoplanets</span>
+          <span className="text-[9px] text-ink/40">select one</span>
         </div>
-        <ul className="max-h-44 space-y-1 overflow-auto pr-1">
+        <ul className="max-h-40 space-y-1 overflow-auto pr-1">
           {entry.planets.map((planet) => {
             const look = classifyPlanet(planet)
             const active = activePlanet && planet.id === activePlanet.id
@@ -83,7 +91,7 @@ export default function SystemPanel({
                   aria-pressed={active}
                   className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition ${
                     active
-                      ? 'border-ion bg-panel/60'
+                      ? 'border-cyan-300/70 bg-panel/60'
                       : 'border-transparent hover:border-line/60 hover:bg-panel/35'
                   }`}
                 >
@@ -105,26 +113,28 @@ export default function SystemPanel({
       <div className="space-y-1.5">
         <button
           type="button"
+          className="btn w-full border-cyan-300/50 py-2 text-[12px] hover:border-cyan-200/70"
+          onClick={() => onExplore(entry)}
+        >
+          Explore System
+        </button>
+        <button
+          type="button"
           className="btn btn-primary w-full py-2 text-[12px]"
           onClick={() => onSetDestination(activePlanet)}
           disabled={!activePlanet || atOrigin}
         >
-          Set as destination
+          Plan Travel
         </button>
         <button
           type="button"
-          className="btn w-full py-2 text-[12px]"
+          className="w-full rounded-lg py-1 text-[10px] text-ink/50 transition hover:text-ink/85 disabled:opacity-40"
           onClick={() => onSetOrigin(activePlanet)}
           disabled={!activePlanet || atOrigin}
         >
-          Depart from here
+          Depart from here instead
         </button>
       </div>
-
-      <p className="text-[10px] leading-relaxed text-ink/40">
-        Positions are NASA RA/Dec/distance converted to a Y-up light-year frame. Scene scale is
-        linear, 1 unit = 1 ly — travel times still use the catalogue vectors.
-      </p>
     </div>
   )
 }

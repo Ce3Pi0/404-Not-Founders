@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import UniverseScene from './UniverseScene'
 import SystemPanel from './SystemPanel'
+import MapSearch from './MapSearch'
 import OrientationGizmo from './OrientationGizmo'
 import { UNMAPPED_SYSTEM_COUNT, distanceLyBetween } from '../../lib/catalog'
 import { formatNumber } from '../../lib/physics'
@@ -12,29 +13,49 @@ import {
   PICK_TARGETS,
   REGION_SYSTEMS,
   REGION_SYSTEM_COUNT,
+  SOLAR_SYSTEM,
   defaultPlanetFor,
   entryIsSolar,
   labelSystems,
   mapSystemFor,
+  mapSystemNamed,
 } from '../../lib/starMap'
 
 /**
  * Interactive 3D universe map of the nearest 150 light-years.
  *
- * Every point is a unique host-star system at its exact catalogue position;
- * selection feeds back into the mission's existing origin/destination state.
+ * Every point is a unique host-star system at its exact catalogue position.
+ * Selection feeds back into the mission's existing origin/destination state,
+ * while `viewState` remembers the inspected star and the camera framing so the
+ * system page's Back control returns to exactly what was left behind.
  */
-export default function StarMapView({ origin, planet, onSetDestination, onSetOrigin, onExit }) {
-  const [selected, setSelected] = useState(null)
+export default function StarMapView({
+  origin,
+  planet,
+  viewState,
+  onSetDestination,
+  onSetOrigin,
+  onExit,
+  onExplore,
+}) {
+  const [selected, setSelected] = useState(() =>
+    mapSystemNamed(viewState?.current?.selected ?? null),
+  )
   const [hovered, setHovered] = useState(null)
   const [activeId, setActiveId] = useState(null)
   const [resetSignal, setResetSignal] = useState(0)
+  const [focus, setFocus] = useState(null)
 
   const labelsRef = useRef(null)
   const scaleBarRef = useRef(null)
   const scaleTextRef = useRef(null)
   const cameraQuaternionRef = useRef(new THREE.Quaternion())
+  const focusKey = useRef(0)
+  const exploreTimer = useRef(null)
 
+  useEffect(() => () => clearTimeout(exploreTimer.current), [])
+
+  const cameraState = viewState?.current?.camera ?? null
   const originEntry = useMemo(() => mapSystemFor(origin), [origin])
   const destinationEntry = useMemo(() => mapSystemFor(planet), [planet])
 
@@ -55,15 +76,65 @@ export default function StarMapView({ origin, planet, onSetDestination, onSetOri
     return { from: originEntry.renderPosition, to: destinationEntry.renderPosition }
   }, [originEntry, destinationEntry])
 
-  const handleSelect = useCallback(
-    (entry) => {
+  /** Distance line from the current location to the inspected system. */
+  const distanceTo = useMemo(() => {
+    if (!selected?.renderPosition || !originEntry?.renderPosition) return null
+    if (selected.name === originEntry.name) return null
+    return { from: originEntry.renderPosition, to: selected.renderPosition }
+  }, [selected, originEntry])
+
+  /** Remember the active world so the system page opens on the same one. */
+  useEffect(() => {
+    if (viewState?.current) viewState.current.planetId = activeId
+  }, [activeId, viewState])
+
+  const focusTo = useCallback((entry, duration) => {
+    if (!entry?.renderPosition) return
+    focusKey.current += 1
+    setFocus({ entry, nonce: focusKey.current, duration })
+  }, [])
+
+  const applySelection = useCallback(
+    (entry, { fly = false, duration } = {}) => {
       setSelected(entry)
       setActiveId(entry ? (defaultPlanetFor(entry, planet)?.id ?? null) : null)
+      if (viewState?.current) viewState.current.selected = entry?.name ?? null
+      if (fly) focusTo(entry, duration)
     },
-    [planet],
+    [focusTo, planet, viewState],
+  )
+
+  /** Clicking a star selects it; the camera stays where the user put it. */
+  const handleSelect = useCallback(
+    (entry) => applySelection(entry),
+    [applySelection],
   )
 
   const handleHover = useCallback((entry) => setHovered(entry), [])
+
+  const handleSearchPick = useCallback(
+    (result) => {
+      applySelection(result.system, { fly: true, duration: 1.3 })
+      if (result.planet) setActiveId(result.planet.id)
+    },
+    [applySelection],
+  )
+
+  /**
+   * Explore dives toward the star, then opens that system's page. The system is
+   * already selected, so the world picked in the card is preserved.
+   */
+  const handleExplore = useCallback(
+    (entry) => {
+      if (!entry) return
+      setSelected(entry)
+      if (viewState?.current) viewState.current.selected = entry.name
+      focusTo(entry, 0.75)
+      clearTimeout(exploreTimer.current)
+      exploreTimer.current = setTimeout(() => onExplore(entry), 780)
+    },
+    [focusTo, onExplore, viewState],
+  )
 
   const activePlanet = useMemo(() => {
     if (!selected) return null
@@ -73,16 +144,19 @@ export default function StarMapView({ origin, planet, onSetDestination, onSetOri
     )
   }, [selected, activeId, planet])
 
-  const routeDistance = originEntry && destinationEntry
-    ? distanceLyBetween(origin, planet)
-    : null
+  const routeDistance =
+    originEntry && destinationEntry ? distanceLyBetween(origin, planet) : null
 
   const notes = []
   if (BEYOND_REGION_COUNT > 0) {
-    notes.push(`${formatNumber(BEYOND_REGION_COUNT, 0)} mapped systems beyond this region are not drawn`)
+    notes.push(
+      `${formatNumber(BEYOND_REGION_COUNT, 0)} mapped systems beyond this region are not drawn`,
+    )
   }
   if (UNMAPPED_SYSTEM_COUNT > 0) {
-    notes.push(`${formatNumber(UNMAPPED_SYSTEM_COUNT, 0)} systems without a measured distance are not plotted`)
+    notes.push(
+      `${formatNumber(UNMAPPED_SYSTEM_COUNT, 0)} systems without a measured distance are not plotted`,
+    )
   }
 
   return (
@@ -97,9 +171,12 @@ export default function StarMapView({ origin, planet, onSetDestination, onSetOri
           scaleTextRef={scaleTextRef}
           cameraQuaternionRef={cameraQuaternionRef}
           route={route}
+          distanceTo={distanceTo}
           selected={selected}
           hovered={hovered}
           resetSignal={resetSignal}
+          cameraState={cameraState}
+          focus={focus}
           onSelect={handleSelect}
           onHover={handleHover}
         />
@@ -124,7 +201,7 @@ export default function StarMapView({ origin, planet, onSetDestination, onSetOri
                   onClick={() => handleSelect(entry)}
                   className={`pointer-events-auto -translate-x-1/2 -translate-y-[150%] rounded border px-1.5 py-[1px] text-[10px] whitespace-nowrap backdrop-blur-sm transition ${
                     active
-                      ? 'border-white/70 bg-void/85 text-white'
+                      ? 'border-cyan-300/80 bg-void/85 text-cyan-100'
                       : home
                         ? 'border-line/60 bg-void/80 text-white hover:border-white/60'
                         : 'border-line/35 bg-void/60 text-ink/75 hover:border-line hover:text-white'
@@ -132,7 +209,7 @@ export default function StarMapView({ origin, planet, onSetDestination, onSetOri
                 >
                   {entry.name}
                   {active && (
-                    <span className="ml-1 text-[9px] text-ink/55">
+                    <span className="ml-1 text-[9px] text-cyan-200/70">
                       {formatNumber(entry.distanceLy, 1)} ly
                     </span>
                   )}
@@ -142,9 +219,11 @@ export default function StarMapView({ origin, planet, onSetDestination, onSetOri
           })}
         </div>
 
-        {/* region and legend */}
-        <div className="pointer-events-none absolute top-3 left-3 z-20 max-w-[288px] space-y-2">
-          <div className="rounded-xl border border-line/50 bg-void/85 px-3 py-2.5 backdrop-blur">
+        {/* search, region and legend */}
+        <div className="absolute top-3 left-3 z-20 w-[300px] space-y-2">
+          <MapSearch originEntry={originEntry} onPick={handleSearchPick} />
+
+          <div className="pointer-events-none rounded-xl border border-line/50 bg-void/85 px-3 py-2.5 backdrop-blur">
             <div className="text-[9px] tracking-[0.18em] text-ink/45 uppercase">Universe map</div>
             <h1 className="mt-0.5 text-[15px] font-semibold tracking-tight">
               Nearest {MAP_REGION_LY} light-years
@@ -169,7 +248,7 @@ export default function StarMapView({ origin, planet, onSetDestination, onSetOri
             )}
           </div>
 
-          <div className="flex flex-wrap gap-x-3 gap-y-1 rounded-xl border border-line/40 bg-void/75 px-3 py-2 text-[9px] text-ink/60 backdrop-blur">
+          <div className="pointer-events-none flex flex-wrap gap-x-3 gap-y-1 rounded-xl border border-line/40 bg-void/75 px-3 py-2 text-[9px] text-ink/60 backdrop-blur">
             <span className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-white" /> Solar System
             </span>
@@ -207,7 +286,8 @@ export default function StarMapView({ origin, planet, onSetDestination, onSetOri
               onPickPlanet={(next) => setActiveId(next.id)}
               onSetDestination={onSetDestination}
               onSetOrigin={onSetOrigin}
-              onClose={() => handleSelect(null)}
+              onExplore={handleExplore}
+              onClose={() => applySelection(null)}
             />
           </div>
         )}
