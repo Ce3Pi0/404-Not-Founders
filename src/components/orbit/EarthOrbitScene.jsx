@@ -8,6 +8,7 @@ import earthSpecularMap from '../../assets/earth/earth_specular_2048.jpg'
 import earthCloudMap from '../../assets/earth/earth_clouds_1024.png'
 import { MAPPED_SYSTEMS } from '../../lib/catalog'
 import { mulberry32, starColor } from '../../lib/planet'
+import { thinSkyStars } from '../../lib/skyStars'
 import { createZoomOutLatch, wheelPixels } from '../../lib/zoomTransition'
 import { createGlowTexture } from '../../lib/glowTexture'
 import { HAS_WEBGL } from '../../lib/webgl'
@@ -143,11 +144,14 @@ function MilkyWay() {
 /**
  * Background stars. The brighter layer uses each catalogue system's real
  * direction (its RA/Dec position projected onto the sky sphere); the dimmer
- * layer is procedural filler, illustrative only.
+ * layer is procedural filler, illustrative only. The thicker catalogue is
+ * thinned on the sky first — see lib/skyStars.js for why.
  */
 function StarField({ glow }) {
   const catalog = useMemo(() => {
-    const systems = MAPPED_SYSTEMS.filter((system) => system.mapPosition && system.distanceLy > 0)
+    const systems = thinSkyStars(
+      MAPPED_SYSTEMS.filter((system) => system.mapPosition && system.distanceLy > 0),
+    )
     const positions = new Float32Array(systems.length * 3)
     const colors = new Float32Array(systems.length * 3)
     const random = mulberry32(8128)

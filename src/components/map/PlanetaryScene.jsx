@@ -6,6 +6,7 @@ import { HAS_WEBGL } from '../../lib/webgl'
 import { createGlowTexture } from '../../lib/glowTexture'
 import { createPlanetTexture, mulberry32 } from '../../lib/planet'
 import { niceAu } from '../../lib/planetSystem'
+import EarthSphere from '../EarthSphere'
 
 /** Cyan is the app's signature accent for the inspected object. */
 const CYAN = '#5ee7ff'
@@ -84,11 +85,17 @@ function OrbitRing({ radius, active }) {
 }
 
 function PlanetBody({ body, selected, glow }) {
-  const surface = useMemo(() => createPlanetTexture(body.planet), [body.planet])
+  // Earth has real imagery, so it wears the same Blue Marble surface as the
+  // dedicated Earth view. Every other world keeps its procedural surface.
+  const isEarth = body.planet.kind === 'earth'
+  const surface = useMemo(
+    () => (isEarth ? null : createPlanetTexture(body.planet)),
+    [body.planet, isEarth],
+  )
   const spin = useRef()
   const radius = body.radiusUnits
 
-  useEffect(() => () => surface.texture.dispose(), [surface])
+  useEffect(() => () => surface?.texture.dispose(), [surface])
 
   useFrame((_, delta) => {
     if (spin.current) spin.current.rotation.y += delta * 0.08
@@ -96,10 +103,16 @@ function PlanetBody({ body, selected, glow }) {
 
   return (
     <group>
-      <mesh ref={spin}>
-        <sphereGeometry args={[radius, 32, 32]} />
-        <meshStandardMaterial map={surface.texture} roughness={0.92} metalness={0.03} />
-      </mesh>
+      <group ref={spin}>
+        {isEarth ? (
+          <EarthSphere radius={radius} segments={64} />
+        ) : (
+          <mesh>
+            <sphereGeometry args={[radius, 32, 32]} />
+            <meshStandardMaterial map={surface.texture} roughness={0.92} metalness={0.03} />
+          </mesh>
+        )}
+      </group>
       {selected && (
         <sprite scale={[radius * 7, radius * 7, 1]}>
           <spriteMaterial

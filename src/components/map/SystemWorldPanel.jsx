@@ -133,9 +133,11 @@ export default function SystemWorldPanel({
           </div>
 
           <p className="text-[9px] leading-relaxed text-ink/40">
-            Surface texture and colour are a visual interpretation generated from bulk estimates —
-            not real imagery. Orbits are circular, at the archive's semi-major axis, with
-            illustrative starting phases: not a present-day ephemeris.
+            {selectedPlanet.kind === 'earth'
+              ? 'Earth is drawn from NASA Blue Marble imagery.'
+              : 'Surface texture and colour are a visual interpretation generated from bulk estimates — not real imagery.'}{' '}
+            Orbits are circular, at the archive's semi-major axis, with illustrative starting
+            phases: not a present-day ephemeris.
           </p>
         </>
       ) : (
