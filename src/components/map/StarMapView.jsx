@@ -73,6 +73,8 @@ export default function StarMapView({
    * to see it: a line to a destination 40 ly away would otherwise run off the
    * opening view before anyone had chosen anything. */
   const [routeVisible, setRouteVisible] = useState(false)
+  /* The reference rings are an optional measuring aid, so the map opens clean. */
+  const [gridVisible, setGridVisible] = useState(false)
 
   const labelsRef = useRef(null)
   const routeLabelRef = useRef(null)
@@ -258,6 +260,7 @@ export default function StarMapView({
           onHover={handleHover}
           onApproachOrigin={onReturnToEarth}
           onExploreEntry={handleActivate}
+          showGrid={gridVisible}
         />
 
         {/* projected names from the 3D positions */}
@@ -435,6 +438,20 @@ export default function StarMapView({
                     </button>
                   </div>
                 )}
+
+                <button
+                  type="button"
+                  data-testid="toggle-grid"
+                  onClick={() => setGridVisible((value) => !value)}
+                  aria-pressed={gridVisible}
+                  className={`w-full rounded-lg border px-2 py-1 text-[9px] tracking-[0.16em] uppercase transition ${
+                    gridVisible
+                      ? 'border-[#5ee7ff]/50 text-[#bff3ff]'
+                      : 'border-white/10 text-white/35 hover:text-white/70'
+                  }`}
+                >
+                  {gridVisible ? 'Grid on' : 'Grid off'}
+                </button>
 
                 <p className="text-[9px] leading-relaxed text-white/35">
                   {formatNumber(REGION_SYSTEM_COUNT, 0)} host stars · 1 unit = 1 ly ·{' '}

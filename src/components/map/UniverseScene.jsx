@@ -773,6 +773,7 @@ function SceneRig({
   view = null,
   maxDistance = 700,
   far = 4000,
+  showGrid = false,
 }) {
   const { camera, gl, size } = useThree()
   const controls = useMemo(() => new OrbitControls(camera, gl.domElement), [camera, gl])
@@ -1189,7 +1190,7 @@ function SceneRig({
       <color attach="background" args={['#000206']} />
       <ambientLight intensity={0.8} />
       <StarField glow={glow} />
-      <ReferenceGrid glow={glow} />
+      {showGrid && <ReferenceGrid glow={glow} />}
       <DepthStems systems={systems} />
       <HostStars systems={systems} glow={glow} />
       <MarkerPoints entries={hoveredEntries} glow={glow} color="#ffd27a" size={14} />
@@ -1237,6 +1238,7 @@ export default function UniverseScene({
   view,
   maxDistance,
   far = 4000,
+  showGrid = false,
 }) {
   const glow = useMemo(createGlowTexture, [])
   const ring = useMemo(createRingTexture, [])
@@ -1298,6 +1300,7 @@ export default function UniverseScene({
         view={view}
         maxDistance={maxDistance}
         far={far}
+        showGrid={showGrid}
       />
     </Canvas>
   )
