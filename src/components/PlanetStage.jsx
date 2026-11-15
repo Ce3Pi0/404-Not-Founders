@@ -1,6 +1,10 @@
-import { memo, useEffect, useMemo, useRef } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { memo, Suspense, useEffect, useMemo, useRef } from 'react'
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import earthDayMap from '../assets/earth/earth_atmos_2048.jpg'
+import earthNormalMap from '../assets/earth/earth_normal_2048.jpg'
+import earthSpecularMap from '../assets/earth/earth_specular_2048.jpg'
+import earthCloudMap from '../assets/earth/earth_clouds_1024.png'
 import { OrbitControls as ThreeOrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import {
   createPlanetTexture,
@@ -11,7 +15,6 @@ import {
   mulberry32,
   hashString,
 } from '../lib/planet'
-import { EARTH_ATMOSPHERE, EARTH_SUN_DIRECTION, useEarthTextures } from '../lib/earthTexture'
 import { describeAge } from '../lib/aging'
 import { formatNumber } from '../lib/physics'
 import BobbleFigure from './BobbleFigure'
@@ -19,167 +22,146 @@ import SkeletonFigure from './SkeletonFigure'
 
 const UP = new THREE.Vector3(0, 1, 0)
 
-/* Where the host star sits in an exoplanet's sky; Earth aims its own star at
- * EARTH_SUN_DIRECTION so the day side matches the real planet. */
-const STAR_DIRECTION = [-0.55, 0.45, -0.7]
-const EARTH_NORMAL_SCALE = new THREE.Vector2(0.9, 0.9)
-
 /* The crew stands on the surface, so their size is fixed in planet radii.
  * ~0.07 of a planet radius keeps a human visible without pretending a person is
  * a meaningful fraction of a world. */
 const CREW_SCALE = 0.07
 
+/* Earth is the one world we have real imagery for, so it is drawn from NASA
+ * Blue Marble maps — day colour, terrain relief, ocean gloss — under a separate
+ * cloud shell. Exoplanets keep the procedural surface. */
+function EarthSurface() {
+  const [day, normal, specular, clouds] = useLoader(THREE.TextureLoader, [
+    earthDayMap,
+    earthNormalMap,
+    earthSpecularMap,
+    earthCloudMap,
+  ])
+  const cloudShell = useRef()
+
+  useMemo(() => {
+    day.colorSpace = THREE.SRGBColorSpace
+    clouds.colorSpace = THREE.SRGBColorSpace
+    for (const texture of [day, normal, specular, clouds]) {
+      texture.anisotropy = 8
+      texture.wrapS = THREE.RepeatWrapping
+    }
+  }, [day, normal, specular, clouds])
+
+  useFrame((_, delta) => {
+    // Clouds drift a little faster than the ground below them.
+    if (cloudShell.current) cloudShell.current.rotation.y += delta * 0.006
+  })
+
+  return (
+    <>
+      <mesh>
+        <sphereGeometry args={[1, 128, 128]} />
+        <meshPhongMaterial
+          map={day}
+          normalMap={normal}
+          normalScale={[0.7, 0.7]}
+          specularMap={specular}
+          specular="#6f9ad0"
+          shininess={16}
+        />
+      </mesh>
+      <mesh ref={cloudShell} scale={1.006}>
+        <sphereGeometry args={[1, 96, 96]} />
+        <meshStandardMaterial
+          map={clouds}
+          transparent
+          opacity={0.9}
+          roughness={1}
+          metalness={0}
+          depthWrite={false}
+        />
+      </mesh>
+    </>
+  )
+}
+
+function EarthPlaceholder() {
+  return (
+    <mesh>
+      <sphereGeometry args={[1, 64, 64]} />
+      <meshStandardMaterial color="#1b4f8c" roughness={0.9} metalness={0.03} />
+    </mesh>
+  )
+}
+
+/** Pale blue rim: a bright inner edge and a soft outer haze, as seen from orbit. */
+function EarthAtmosphere() {
+  return (
+    <group>
+      <mesh scale={1.028}>
+        <sphereGeometry args={[1, 64, 64]} />
+        <meshBasicMaterial
+          color="#7cc0ff"
+          transparent
+          opacity={0.5}
+          side={THREE.BackSide}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh scale={1.09}>
+        <sphereGeometry args={[1, 64, 64]} />
+        <meshBasicMaterial
+          color="#3f7fd0"
+          transparent
+          opacity={0.14}
+          side={THREE.BackSide}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
+  )
+}
+
 function PlanetMesh({ planet, earthYears, alienYears }) {
   const isEarth = planet.kind === 'earth'
-  const { texture, look } = useMemo(() => createPlanetTexture(planet), [planet])
-  // Earth is the one world with a known surface: real continents, relief, ocean
-  // glint, city lights and a cloud shell instead of an inferred palette.
-  const earthTextures = useEarthTextures()
-  const earth = isEarth ? earthTextures : null
+  const surface = useMemo(
+    () => (isEarth ? null : createPlanetTexture(planet)),
+    [planet, isEarth],
+  )
+  const look = useMemo(() => classifyPlanet(planet), [planet])
   const tilt = useMemo(() => {
-    if (isEarth) return 0.409 // 23.4° axial tilt
     const rand = mulberry32(hashString(planet.name))
     return rand() * 0.5 - 0.25
-  }, [isEarth, planet.name])
+  }, [planet.name])
   const spin = useRef()
-  const clouds = useRef()
 
-  useEffect(() => () => texture.dispose(), [texture])
+  useEffect(() => () => surface?.texture.dispose(), [surface])
 
   useFrame((_, delta) => {
     if (spin.current) spin.current.rotation.y += delta * 0.02
-    if (clouds.current) clouds.current.rotation.y += delta * 0.028
   })
 
   return (
     <group rotation={[0, 0, tilt]}>
       <group ref={spin}>
-        <mesh>
-          <sphereGeometry args={[1, 128, 128]} />
-          {earth ? (
-            <meshPhongMaterial
-              map={earth.surface}
-              normalMap={earth.normal}
-              normalScale={EARTH_NORMAL_SCALE}
-              specularMap={earth.specular}
-              specular="#3a6484"
-              shininess={24}
-            />
-          ) : (
-            <meshStandardMaterial map={texture} roughness={0.9} metalness={0.03} />
-          )}
-        </mesh>
-        {earth && <NightLights map={earth.lights} />}
+        {isEarth ? (
+          <Suspense fallback={<EarthPlaceholder />}>
+            <EarthSurface />
+          </Suspense>
+        ) : (
+          <mesh>
+            <sphereGeometry args={[1, 96, 96]} />
+            <meshStandardMaterial map={surface.texture} roughness={0.9} metalness={0.03} />
+          </mesh>
+        )}
         <SurfaceCrew planet={planet} look={look} earthYears={earthYears} alienYears={alienYears} />
       </group>
-      {earth && (
-        <mesh ref={clouds} scale={1.008}>
-          <sphereGeometry args={[1, 128, 128]} />
-          <meshPhongMaterial
-            color="#ffffff"
-            alphaMap={earth.clouds}
-            transparent
-            opacity={0.92}
-            depthWrite={false}
-            shininess={2}
-          />
-        </mesh>
-      )}
-      <Atmosphere color={earth ? EARTH_ATMOSPHERE : look.atmosphere} rim={isEarth} />
+      {isEarth ? <EarthAtmosphere /> : <Atmosphere color={look.atmosphere} />}
     </group>
   )
 }
 
-/**
- * City lights. They ride on a shell just above the surface and are masked by the
- * same direction as Earth's sun, so they only appear where the planet is dark —
- * the warm dotted edge along the night side that makes the globe read as inhabited.
- */
-function NightLights({ map }) {
-  const uniforms = useMemo(
-    () => ({
-      uMap: { value: map },
-      uSun: { value: new THREE.Vector3(...EARTH_SUN_DIRECTION).normalize() },
-      uIntensity: { value: 1 },
-    }),
-    [map],
-  )
-
-  return (
-    <mesh scale={1.002}>
-      <sphereGeometry args={[1, 128, 128]} />
-      <shaderMaterial
-        uniforms={uniforms}
-        transparent
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-        vertexShader={`
-          varying vec2 vUv;
-          varying vec3 vWorldNormal;
-          void main() {
-            vUv = uv;
-            vWorldNormal = normalize(mat3(modelMatrix) * normal);
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `}
-        fragmentShader={`
-          uniform sampler2D uMap;
-          uniform vec3 uSun;
-          uniform float uIntensity;
-          varying vec2 vUv;
-          varying vec3 vWorldNormal;
-          void main() {
-            vec3 lights = texture2D(uMap, vUv).rgb;
-            float lit = dot(normalize(vWorldNormal), normalize(uSun));
-            float night = 1.0 - smoothstep(-0.22, 0.14, lit);
-            gl_FragColor = vec4(lights * night * uIntensity, 1.0);
-          }
-        `}
-      />
-    </mesh>
-  )
-}
-
-/**
- * Atmospheric glow. Earth keeps the soft rim shader that reads as a real
- * planet limb; the inferred worlds use the flat shell.
- */
-function Atmosphere({ color, rim = false }) {
-  const uniforms = useMemo(() => ({ uColor: { value: new THREE.Color(color) } }), [color])
-
-  if (rim) {
-    return (
-      <mesh scale={1.045}>
-        <sphereGeometry args={[1, 64, 64]} />
-        <shaderMaterial
-          uniforms={uniforms}
-          transparent
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-          vertexShader={`
-            varying vec3 vNormal;
-            varying vec3 vView;
-            void main() {
-              vec4 mv = modelViewMatrix * vec4(position, 1.0);
-              vNormal = normalize(normalMatrix * normal);
-              vView = normalize(-mv.xyz);
-              gl_Position = projectionMatrix * mv;
-            }
-          `}
-          fragmentShader={`
-            uniform vec3 uColor;
-            varying vec3 vNormal;
-            varying vec3 vView;
-            void main() {
-              float rim = 1.0 - max(dot(normalize(vNormal), normalize(vView)), 0.0);
-              gl_FragColor = vec4(uColor, pow(rim, 2.6) * 0.85);
-            }
-          `}
-        />
-      </mesh>
-    )
-  }
-
+function Atmosphere({ color }) {
   return (
     <mesh scale={1.03}>
       <sphereGeometry args={[1, 48, 48]} />
@@ -278,15 +260,15 @@ function SurfaceCrew({ planet, look, earthYears, alienYears }) {
  * planet's orbit — so a hot Jupiter's sun fills the sky while a distant world
  * sees a small disc. Star and planet therefore keep their true relative size.
  */
-function HostStar({ planet, direction = STAR_DIRECTION, intensity = 2.4 }) {
+function HostStar({ planet }) {
   const color = useMemo(() => starColor(planet.starTeffK), [planet.starTeffK])
   const angle = starAngularDiameterDeg(planet) ?? 1.5
   const distance = 20
   const radius = THREE.MathUtils.clamp(Math.tan((angle * Math.PI) / 360) * distance, 0.08, 7)
   const position = useMemo(() => {
-    const vector = new THREE.Vector3(...direction).normalize()
-    return vector.multiplyScalar(distance).toArray()
-  }, [direction])
+    const direction = new THREE.Vector3(-0.55, 0.45, -0.7).normalize()
+    return direction.multiplyScalar(distance).toArray()
+  }, [])
 
   return (
     <group position={position}>
@@ -305,7 +287,7 @@ function HostStar({ planet, direction = STAR_DIRECTION, intensity = 2.4 }) {
           toneMapped={false}
         />
       </mesh>
-      <directionalLight position={[0, 0, 0]} intensity={intensity} color={color} />
+      <directionalLight position={[0, 0, 0]} intensity={2.4} color={color} />
     </group>
   )
 }
@@ -371,21 +353,20 @@ function OrbitRig() {
 
 function Scene({ planet, earthYears, alienYears }) {
   const isEarth = planet.kind === 'earth'
+
   return (
     <>
-      <ambientLight intensity={isEarth ? 0.08 : 0.22} />
+      <ambientLight intensity={0.22} />
       {/* camera-side fill so the visible hemisphere reads; the host star is the key light */}
       <directionalLight
         position={[2.6, 1.2, 5.5]}
-        intensity={isEarth ? 0.3 : 0.95}
+        intensity={isEarth ? 0.32 : 0.95}
         color="#ffffff"
       />
+      {/* Earth's sun sits high and to the left, leaving the terminator at the lower right. */}
+      {isEarth && <directionalLight position={[-2.6, 2.4, 4.2]} intensity={1.6} color="#fff6ea" />}
       <StarField />
-      <HostStar
-        planet={planet}
-        direction={isEarth ? EARTH_SUN_DIRECTION : STAR_DIRECTION}
-        intensity={isEarth ? 2 : 2.4}
-      />
+      <HostStar planet={planet} />
       <PlanetMesh planet={planet} earthYears={earthYears} alienYears={alienYears} />
       <OrbitRig />
     </>
