@@ -123,8 +123,9 @@ higher-priority one is dropped instead of stacked (`pickVisibleLabels` in `lib/m
   from the current location, its known exoplanets, **Explore System** and **Plan Travel**. Clicking
   blank space clears the selection. The navigation rail on the left stays compact (search, current
   location, destination with distance, system count) so the map keeps most of the viewport.
-- **Double-clicking** a star dives into it: the Solar System hands over to the home scene (the Solar
-  System close-up with Earth marked as home), an exoplanet host opens its local system explorer
+- **Double-clicking** a star dives into it: the Solar System hands over to the home scene (Earth
+  close up and filling the frame, with the Sun and the drawn orbits behind it), an exoplanet host
+  opens its local system explorer
   (`/system/:id`, AU scale). The same dive also runs
   when a pointer leaves the map through the solar marker while zooming in.
 - The search field matches host stars and individual planets straight from the archive extract,

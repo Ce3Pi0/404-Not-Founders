@@ -3,72 +3,86 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { MAPPED_SYSTEMS } from '../../lib/catalog'
-import { createPlanetTexture, mulberry32, starColor } from '../../lib/planet'
-import { buildPlanetSystem } from '../../lib/planetSystem'
+import { mulberry32, starColor } from '../../lib/planet'
 import { thinSkyStars } from '../../lib/skyStars'
-import { SOLAR_SYSTEM } from '../../lib/starMap'
 import { createZoomOutLatch, wheelPixels } from '../../lib/zoomTransition'
-import { createGlowTexture, createRingTexture } from '../../lib/glowTexture'
+import { createGlowTexture } from '../../lib/glowTexture'
 import { createSunSurfaceTexture } from '../../lib/sunSurface'
 import { HAS_WEBGL } from '../../lib/webgl'
 import EarthSphere from '../EarthSphere'
 
 /**
- * The opening scene: the Solar System from just above the ecliptic, with Earth
- * carrying the "you are here" marker.
+ * The opening scene: Earth, close up and filling the frame, with the rest of the
+ * Solar System in the sky behind it.
  *
- * Scale note — one scene unit is one AU, and every orbit's *drawn* radius comes
- * from `buildPlanetSystem`, which log-spaces a system this wide (0.39–30 AU) so
- * the rocky worlds do not collapse into the Sun. The archive's semi-major axes
- * are untouched and still reported everywhere else in the app; planet sizes are
- * exaggerated for visibility and orbital phases are illustrative, never an
- * ephemeris. Orbit rates keep their true ratios from the observed periods, so
- * Mercury laps Neptune rather than the other way round.
+ * Scale note — one scene unit is one Earth radius (6,371 km). The Sun and the
+ * neighbouring worlds behind it are drawn far smaller than their true angular
+ * size would be at that range; this is a composition, not an ephemeris. The
+ * headline Earth is the real thing: NASA's Blue Marble day colour, relief,
+ * ocean gloss and cloud shell, so the journey starts on the world we know.
  */
-const SOLAR = buildPlanetSystem(SOLAR_SYSTEM)
-const EXTENT = SOLAR?.extentAu ?? 30
+
+const SPACE = '#04010c'
+/** Everything that is "sky" (stars, Milky Way, the distant system) sits here. */
+const SKY_RADIUS = 600
+const EARTH_TILT = THREE.MathUtils.degToRad(23.4)
 const TAU = Math.PI * 2
 
-/** Hero clock: in simulated days per real second. */
-const DAYS_PER_SECOND = 3
-
-const SPACE = '#05050a'
-/** The Sun's own warm tones — the star is never drawn as a white ball. */
-const SUN_MID = '#ffb75e'
-const SUN_GLOW = '#ff8a24'
-/** Orbit paths read as thin, cool, glowing rings against the black. */
-const ORBIT_COLOR = '#3f6f9e'
-const ORBIT_HOME = '#8fd8ff'
-
-const EARTH_BODY = SOLAR?.bodies.find((body) => body.planet.id === 'earth') ?? null
-const EARTH_START = EARTH_BODY
-  ? new THREE.Vector3(
-      Math.cos(EARTH_BODY.phase) * EARTH_BODY.orbitUnits,
-      0,
-      Math.sin(EARTH_BODY.phase) * EARTH_BODY.orbitUnits,
-    )
-  : new THREE.Vector3(1, 0, 0)
+/** Opening viewpoint: close enough that Earth fills the frame. */
+const HOME_CAMERA = new THREE.Vector3(0.86, 0.47, 3.2)
+/**
+ * Earth is staged low and left so the upper-right of the frame is open sky —
+ * that is where the Sun and the rest of the system hang.
+ */
+const VIEW_SHIFT_X = 0.11
+const VIEW_SHIFT_Y = -0.13
+const CAMERA_AXIS = HOME_CAMERA.clone().normalize()
+const SCREEN_RIGHT = new THREE.Vector3()
+  .crossVectors(new THREE.Vector3(0, 1, 0), CAMERA_AXIS)
+  .normalize()
+const SCREEN_UP = new THREE.Vector3().crossVectors(CAMERA_AXIS, SCREEN_RIGHT).normalize()
 
 /**
- * Opening viewpoint: above the ecliptic and just off the Sun–Earth line, so the
- * Sun sits near the middle of frame and Earth is the nearest orbit — the focus
- * the journey starts from.
+ * The Sun is staged just beyond Earth's upper-right limb, and the key light
+ * carries the same offset, so the brightest part of Earth's disc and the limb
+ * glow both face the visible Sun. One offset, one reading — see the scale note
+ * above: a real Sun this close to Earth's disc would put us on the night side,
+ * which is not the opening shot this screen is for.
  */
-const VIEW_AZIMUTH = (EARTH_BODY?.phase ?? 0) + THREE.MathUtils.degToRad(18)
-const HOME_DISTANCE = EXTENT * 2.15
-const HOME_CAMERA = new THREE.Vector3(
-  Math.cos(VIEW_AZIMUTH) * HOME_DISTANCE * 0.85,
-  HOME_DISTANCE * 0.53,
-  Math.sin(VIEW_AZIMUTH) * HOME_DISTANCE * 0.85,
-)
-const HOME_TARGET = EARTH_START.clone().multiplyScalar(0.45)
+const SUN_ANGLE = THREE.MathUtils.degToRad(22)
+const SUN_AZIMUTH = THREE.MathUtils.degToRad(34)
+const SUN_DISTANCE = 400
+/** Screen-space offset of the Sun (up and to the right) from Earth's centre. */
+const SUN_OFFSET = SCREEN_UP.clone()
+  .multiplyScalar(Math.sin(SUN_ANGLE) * Math.cos(SUN_AZIMUTH))
+  .add(SCREEN_RIGHT.clone().multiplyScalar(Math.sin(SUN_ANGLE) * Math.sin(SUN_AZIMUTH)))
+/** Where the Sun is drawn: past Earth, so it sits in the sky on screen. */
+const SUN_DIRECTION = SUN_OFFSET.clone()
+  .addScaledVector(CAMERA_AXIS, -Math.cos(SUN_ANGLE))
+  .normalize()
+/** Where the light comes from: the same direction seen from the camera side. */
+const SUN_LIGHT_DIRECTION = SUN_OFFSET.clone()
+  .addScaledVector(CAMERA_AXIS, Math.cos(SUN_ANGLE))
+  .normalize()
+const SUN_POSITION = SUN_DIRECTION.clone().multiplyScalar(SUN_DISTANCE)
+const SUN_LIGHT_POSITION = SUN_LIGHT_DIRECTION.clone().multiplyScalar(SUN_DISTANCE)
+const SUN_RADIUS = SUN_DISTANCE * Math.tan(THREE.MathUtils.degToRad(2.6))
 
-/** Furthest the opening camera may pull back before the handoff gesture. */
-const MAX_DISTANCE = EXTENT * 2.9
-/** Close enough to inspect a planet's surface without entering the Sun. */
-const MIN_DISTANCE = EXTENT * 0.08
-/** Within this share of the limit the scene is "at the limit" for the handoff. */
-const LIMIT_BAND = 0.9
+/** The system's orbit plane, seen from Earth: tilted, mostly face-on. */
+const SYSTEM_ROTATION = new THREE.Quaternion()
+  .setFromAxisAngle(SCREEN_RIGHT, THREE.MathUtils.degToRad(32))
+  .multiply(
+    new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), CAMERA_AXIS),
+  )
+
+/** The other worlds in the sky — illustrative companions, not true positions. */
+const NEIGHBOURS = [
+  { orbit: 45, angle: 0.4, size: 3, color: '#f2dcae' },
+  { orbit: 45, angle: 3.5, size: 2.4, color: '#d9c39a' },
+  { orbit: 70, angle: 5.4, size: 6, color: '#e8c79a', halo: '#ffd9a1', haloScale: 3 },
+  { orbit: 100, angle: 3.4, size: 5, color: '#dbc79b', ring: true },
+  { orbit: 130, angle: 1.1, size: 3.8, color: '#a9c9e6', halo: '#bcdcf5', haloScale: 3 },
+]
 
 /* --------------------------------------------------------------- textures -- */
 
@@ -84,8 +98,6 @@ function createMilkyWayTexture() {
   context.fillRect(0, 0, width, height)
 
   const random = mulberry32(1977)
-  // Violet-to-magenta dust with warm gold star clouds, the palette of the
-  // reference: deep indigo hazing into pinks, picked out by gold.
   const tones = [
     [104, 62, 176],
     [128, 44, 158],
@@ -132,14 +144,14 @@ function MilkyWay() {
   useEffect(() => () => texture.dispose(), [texture])
 
   return (
-    <mesh rotation={[0.5, 1.42, 0.3]} scale={EXTENT * 90}>
+    <mesh rotation={[0.55, 1.3, 0.24]} scale={SKY_RADIUS * 1.6}>
       <sphereGeometry args={[1, 48, 48]} />
       <meshBasicMaterial
         map={texture}
         color="#d9c8ff"
         side={THREE.BackSide}
         transparent
-        opacity={0.85}
+        opacity={0.7}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
         toneMapped={false}
@@ -151,8 +163,7 @@ function MilkyWay() {
 /**
  * Background stars. The brighter layer uses each catalogue system's real
  * direction (its RA/Dec position projected onto the sky sphere); the dimmer
- * layer is procedural filler, illustrative only. The thicker catalogue is
- * thinned on the sky first — see lib/skyStars.js for why.
+ * layer is procedural filler, illustrative only.
  */
 function StarField({ glow }) {
   const catalog = useMemo(() => {
@@ -168,7 +179,7 @@ function StarField({ glow }) {
     systems.forEach((system, index) => {
       direction.set(...system.mapPosition)
       if (direction.lengthSq() === 0) return
-      direction.normalize().multiplyScalar(EXTENT * (11 + random() * 4))
+      direction.normalize().multiplyScalar(SKY_RADIUS * (0.9 + random() * 0.15))
       positions.set([direction.x, direction.y, direction.z], index * 3)
       color.set(starColor(system.planets[0]?.starTeffK))
       color.lerp(white, 0.5)
@@ -189,7 +200,7 @@ function StarField({ glow }) {
     for (let i = 0; i < count; i += 1) {
       const u = random() * 2 - 1
       const theta = random() * Math.PI * 2
-      const radius = EXTENT * (11.5 + random() * 6)
+      const radius = SKY_RADIUS * (0.94 + random() * 0.06)
       const ring = Math.sqrt(1 - u * u)
       positions.set(
         [Math.cos(theta) * ring * radius, u * radius, Math.sin(theta) * ring * radius],
@@ -229,7 +240,7 @@ function StarField({ glow }) {
       <points geometry={catalog} frustumCulled={false}>
         <pointsMaterial
           map={glow}
-          size={2.9}
+          size={2.6}
           sizeAttenuation={false}
           vertexColors
           transparent
@@ -242,36 +253,105 @@ function StarField({ glow }) {
   )
 }
 
-/* ------------------------------------------------------------ the system -- */
+/* ------------------------------------------------------------------ Earth -- */
 
-/**
- * The Sun: a textured photosphere — granulation, dark plasma patches and
- * sunspots, see lib/sunSurface.js — wrapped in progressively wider, softer
- * glows drawn from the same sprite the rest of the map uses. Its light is the
- * scene's only key light, so the planets' phases are the real ones.
- */
+/** Fresnel rim: thin blue airglow on the lit limb, softer haze outside it. */
+function AtmosphereShell({ scale, color, power, strength }) {
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: {
+          uColor: { value: new THREE.Color(color) },
+          uSun: { value: SUN_LIGHT_DIRECTION.clone() },
+          uPower: { value: power },
+          uStrength: { value: strength },
+        },
+        vertexShader: /* glsl */ `
+          varying vec3 vWorldNormal;
+          varying vec3 vViewDirection;
+          void main() {
+            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+            vWorldNormal = normalize(mat3(modelMatrix) * normal);
+            vViewDirection = normalize(cameraPosition - worldPosition.xyz);
+            gl_Position = projectionMatrix * viewMatrix * worldPosition;
+          }
+        `,
+        fragmentShader: /* glsl */ `
+          uniform vec3 uColor;
+          uniform vec3 uSun;
+          uniform float uPower;
+          uniform float uStrength;
+          varying vec3 vWorldNormal;
+          varying vec3 vViewDirection;
+          void main() {
+            float rim = pow(clamp(1.0 - abs(dot(vWorldNormal, vViewDirection)), 0.0, 1.0), uPower);
+            float sun = clamp(dot(vWorldNormal, normalize(uSun)), 0.0, 1.0);
+            float glow = rim * uStrength * (0.16 + 0.95 * pow(sun, 0.65));
+            gl_FragColor = vec4(uColor, glow);
+          }
+        `,
+        transparent: true,
+        side: THREE.BackSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      }),
+    [color, power, strength],
+  )
+
+  useEffect(() => () => material.dispose(), [material])
+
+  return (
+    <mesh scale={scale} material={material}>
+      <sphereGeometry args={[1, 96, 96]} />
+    </mesh>
+  )
+}
+
+function Earth() {
+  const spin = useRef()
+
+  useFrame((_, delta) => {
+    // One calm turn, slow enough to read the continents.
+    if (spin.current) spin.current.rotation.y += delta * 0.02
+  })
+
+  return (
+    <group rotation={[0, 0, EARTH_TILT]}>
+      <group ref={spin} rotation={[0, -2.36, 0]}>
+        <EarthSphere radius={1} segments={160} cloudOpacity={0.9} />
+      </group>
+      <AtmosphereShell scale={1.014} color="#8ec6ff" power={2.8} strength={0.95} />
+      <AtmosphereShell scale={1.055} color="#3d74c8" power={1.7} strength={0.4} />
+    </group>
+  )
+}
+
+/* ------------------------------------------------------- the Solar System -- */
+
+/** The Sun, small in the distance: textured photosphere wrapped in warm glows. */
 function Sun({ glow }) {
-  const radius = SOLAR.star.units
   const surface = useMemo(createSunSurfaceTexture, [])
-  const core = useRef(null)
+  const core = useRef()
   useEffect(() => () => surface.dispose(), [surface])
   useFrame((_, delta) => {
-    if (core.current) core.current.rotation.y += delta * 0.035
+    if (core.current) core.current.rotation.y += delta * 0.03
   })
+
   const layers = [
-    { scale: 1.45, color: '#fff2cf', opacity: 0.85 },
-    { scale: 2.7, color: SUN_MID, opacity: 0.5 },
-    { scale: 5, color: SUN_GLOW, opacity: 0.22 },
+    { scale: 1.5, color: '#fff2cf', opacity: 0.9 },
+    { scale: 2.6, color: '#ffb75e', opacity: 0.45 },
+    { scale: 4.6, color: '#ff8a24', opacity: 0.16 },
   ]
 
   return (
     <group>
       <mesh ref={core}>
-        <sphereGeometry args={[radius, 64, 64]} />
+        <sphereGeometry args={[SUN_RADIUS, 48, 48]} />
         <meshBasicMaterial map={surface} toneMapped={false} />
       </mesh>
       {layers.map((layer) => (
-        <sprite key={layer.scale} scale={[radius * layer.scale, radius * layer.scale, 1]}>
+        <sprite key={layer.scale} scale={[SUN_RADIUS * layer.scale, SUN_RADIUS * layer.scale, 1]}>
           <spriteMaterial
             map={glow}
             color={layer.color}
@@ -282,16 +362,14 @@ function Sun({ glow }) {
           />
         </sprite>
       ))}
-      {/* decay 0: an AU-scale scene must keep the outer worlds lit. */}
-      <pointLight intensity={2.6} decay={0} color="#fff0cf" />
     </group>
   )
 }
 
-/** Circular orbit at the drawn radius (see the scale note at the top). */
-function OrbitRing({ radius, highlight }) {
+/** One drawn orbit around the Sun — a thin cool ring, as on the star map. */
+function OrbitArc({ radius }) {
   const geometry = useMemo(() => {
-    const segments = 240
+    const segments = 220
     const points = []
     for (let i = 0; i < segments; i += 1) {
       const angle = (i / segments) * TAU
@@ -304,134 +382,64 @@ function OrbitRing({ radius, highlight }) {
 
   return (
     <lineLoop geometry={geometry}>
-      <lineBasicMaterial
-        color={highlight ? ORBIT_HOME : ORBIT_COLOR}
-        transparent
-        opacity={highlight ? 0.5 : 0.3}
-        depthWrite={false}
-      />
+      <lineBasicMaterial color="#5f93c9" transparent opacity={0.45} depthWrite={false} />
     </lineLoop>
   )
 }
 
-/** Banded tan terrain for Saturn's ring disc — planar UVs, so circles read as rings. */
-function createSaturnRingTexture() {
-  const size = 512
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const context = canvas.getContext('2d')
-  const centre = size / 2
-  const random = mulberry32(9031)
-
-  let radius = size * 0.295
-  while (radius < size * 0.5) {
-    const width = 0.8 + random() * 6
-    const tone = 138 + Math.floor(random() * 84)
-    context.strokeStyle = `rgba(${tone + 26},${tone},${Math.floor(tone * 0.78)},${
-      0.12 + random() * 0.5
-    })`
-    context.lineWidth = width
-    context.beginPath()
-    context.arc(centre, centre, radius, 0, TAU)
-    context.stroke()
-    radius += width * (0.45 + random() * 0.95)
-  }
-
-  // Cassini division: a clean gap through the bands.
-  context.globalCompositeOperation = 'destination-out'
-  context.lineWidth = 6
-  context.beginPath()
-  context.arc(centre, centre, size * 0.4, 0, TAU)
-  context.stroke()
-  context.globalCompositeOperation = 'source-over'
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.needsUpdate = true
-  return texture
-}
-
-function SaturnRings({ radius }) {
-  const rings = useMemo(createSaturnRingTexture, [])
-  useEffect(() => () => rings.dispose(), [rings])
+/** A neighbour on its orbit: a small bright disc, plus Saturn's ring and halos. */
+function Neighbour({ body, glow }) {
+  const position = useMemo(
+    () => new THREE.Vector3(Math.cos(body.angle) * body.orbit, 0, Math.sin(body.angle) * body.orbit),
+    [body],
+  )
 
   return (
-    <mesh rotation={[-Math.PI / 2 + 0.47, 0, 0.22]} scale={radius}>
-      <ringGeometry args={[1.32, 2.25, 160]} />
-      <meshBasicMaterial
-        map={rings}
-        transparent
-        opacity={0.95}
-        side={THREE.DoubleSide}
-        depthWrite={false}
-        toneMapped={false}
-      />
-    </mesh>
-  )
-}
-
-/**
- * One planet riding its orbit. Earth wears the shared Blue Marble surface and
- * a small home marker; every other world keeps its procedural surface.
- */
-function PlanetBody({ body, ring }) {
-  const isEarth = body.planet.kind === 'earth'
-  const isSaturn = body.planet.id === 'saturn'
-  const surface = useMemo(
-    () => (isEarth ? null : createPlanetTexture(body.planet)),
-    [body.planet, isEarth],
-  )
-  const orbit = useRef(null)
-  const spin = useRef(null)
-  const elapsed = useRef(0)
-
-  useEffect(() => () => surface?.texture.dispose(), [surface])
-
-  useFrame((_, delta) => {
-    elapsed.current += delta
-    const angle = body.phase + elapsed.current * body.angularSpeed * DAYS_PER_SECOND
-    if (orbit.current) {
-      orbit.current.position.set(
-        Math.cos(angle) * body.orbitUnits,
-        0,
-        Math.sin(angle) * body.orbitUnits,
-      )
-    }
-    if (spin.current) spin.current.rotation.y += delta * 0.09
-  })
-
-  // Earth is drawn slightly above its slot size so the home world can be picked
-  // out on its orbit; every size here is illustrative (see the scale note).
-  const radius = body.radiusUnits * (isEarth ? 1.7 : 1)
-
-  return (
-    <group ref={orbit}>
-      <group ref={spin}>
-        {isEarth ? (
-          <EarthSphere radius={radius} segments={64} />
-        ) : (
-          <mesh>
-            <sphereGeometry args={[radius, 32, 32]} />
-            <meshStandardMaterial map={surface.texture} roughness={0.92} metalness={0.03} />
-          </mesh>
-        )}
-      </group>
-      {/* Home marker: a hairline ring just outside the disc, depth-tested so it
-          can never paint over Earth. Small on purpose — the planet stays
-          readable when you zoom in. */}
-      {isEarth && (
-        <sprite scale={[radius * 2.75, radius * 2.75, 1]}>
-          <spriteMaterial
-            map={ring}
-            color="#8fd8ff"
+    <group position={position}>
+      <mesh>
+        <sphereGeometry args={[body.size, 24, 24]} />
+        <meshBasicMaterial color={body.color} toneMapped={false} />
+      </mesh>
+      {body.ring && (
+        <mesh rotation={[-Math.PI / 2 + 0.42, 0, 0.3]}>
+          <ringGeometry args={[body.size * 1.45, body.size * 2.4, 64]} />
+          <meshBasicMaterial
+            color="#d8c39a"
             transparent
-            opacity={0.45}
+            opacity={0.6}
+            side={THREE.DoubleSide}
             depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
+      {body.halo && (
+        <sprite scale={[body.size * body.haloScale, body.size * body.haloScale, 1]}>
+          <spriteMaterial
+            map={glow}
+            color={body.halo}
+            transparent
+            opacity={0.4}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
           />
         </sprite>
       )}
-      {isSaturn && <SaturnRings radius={radius} />}
+    </group>
+  )
+}
+
+/** The rest of the system, hanging in the sky behind Earth. */
+function SolarSystemBackdrop({ glow }) {
+  return (
+    <group position={SUN_POSITION} quaternion={SYSTEM_ROTATION}>
+      <Sun glow={glow} />
+      {[45, 70, 100, 130].map((radius) => (
+        <OrbitArc key={radius} radius={radius} />
+      ))}
+      {NEIGHBOURS.map((body, index) => (
+        <Neighbour key={index} body={body} glow={glow} />
+      ))}
     </group>
   )
 }
@@ -439,14 +447,8 @@ function PlanetBody({ body, ring }) {
 /* ------------------------------------------------------------- interaction -- */
 
 /**
- * The opening camera, plus the zoom-out handoff to the star map.
- *
- * The handoff: engaged scene + camera inside the limit band + 150 normalised
- * pixels of outward wheel travel (lib/zoomTransition.js). The latch fires once
- * per gesture, so repeats cannot double-fire, and scrolling back in clears it.
- * Engagement is what keeps a page scroll over the hero from warping anyone: the
- * scene must have been clicked (or focused), and it lets go when the pointer
- * leaves the canvas.
+ * Orbit Earth, plus the zoom-out handoff to the star map: engaged scene +
+ * camera inside the limit band + 150 normalised pixels of outward wheel travel.
  */
 function OrbitRig({ onZoomOut, onLimitChange }) {
   const { camera, gl } = useThree()
@@ -462,14 +464,14 @@ function OrbitRig({ onZoomOut, onLimitChange }) {
     instance.enableDamping = true
     instance.dampingFactor = 0.05
     instance.rotateSpeed = 0.4
-    instance.zoomSpeed = 0.55
-    instance.minDistance = MIN_DISTANCE
-    instance.maxDistance = MAX_DISTANCE
+    instance.zoomSpeed = 0.5
+    instance.minDistance = 2.15
+    instance.maxDistance = 8.4
     instance.minPolarAngle = Math.PI * 0.12
-    instance.maxPolarAngle = Math.PI * 0.86
+    instance.maxPolarAngle = Math.PI * 0.88
     instance.autoRotate = true
-    instance.autoRotateSpeed = 0.06
-    instance.target.copy(HOME_TARGET)
+    instance.autoRotateSpeed = 0.07
+    instance.target.set(0, 0, 0)
     instance.update()
     controls.current = instance
 
@@ -502,7 +504,7 @@ function OrbitRig({ onZoomOut, onLimitChange }) {
     const handleWheel = (event) => {
       const pixels = wheelPixels(event)
       const distance = camera.position.distanceTo(instance.target)
-      const withinLimit = distance >= instance.maxDistance * LIMIT_BAND
+      const withinLimit = distance >= instance.maxDistance * 0.9
 
       clearTimeout(idleTimer)
       idleTimer = setTimeout(() => {
@@ -548,12 +550,25 @@ function OrbitRig({ onZoomOut, onLimitChange }) {
   return null
 }
 
-/** Widen the lens on tall screens so the inner system stays in frame. */
+/**
+ * Frame the globe: a wide lens on tall screens, and Earth set a little below
+ * centre so the Sun and the drawn orbits keep the upper band of the sky.
+ */
 function ResponsiveFraming() {
   const { camera, size } = useThree()
   useEffect(() => {
-    const aspect = size.width / Math.max(1, size.height)
-    camera.fov = aspect < 1 ? 66 : 48
+    const width = Math.max(1, size.width)
+    const height = Math.max(1, size.height)
+    const aspect = width / height
+    camera.fov = aspect < 1 ? 54 : 46
+    camera.setViewOffset(
+      width,
+      height,
+      width * VIEW_SHIFT_X,
+      height * VIEW_SHIFT_Y,
+      width,
+      height,
+    )
     camera.updateProjectionMatrix()
   }, [camera, size.width, size.height])
   return null
@@ -561,33 +576,18 @@ function ResponsiveFraming() {
 
 function Scene({ onZoomOut, onLimitChange }) {
   const glow = useMemo(createGlowTexture, [])
-  const ring = useMemo(() => createRingTexture(5), [])
-  useEffect(
-    () => () => {
-      glow.dispose()
-      ring.dispose()
-    },
-    [glow, ring],
-  )
+  useEffect(() => () => glow.dispose(), [glow])
 
   return (
     <>
       <color attach="background" args={[SPACE]} />
       <ResponsiveFraming />
-      <ambientLight intensity={0.14} color="#5f7bb8" />
+      <ambientLight intensity={0.1} color="#5f7bb8" />
+      <directionalLight position={SUN_LIGHT_POSITION} intensity={2.7} color="#fff1d6" />
       <MilkyWay />
       <StarField glow={glow} />
-      <Sun glow={glow} />
-      {SOLAR.bodies.map((body) => (
-        <OrbitRing
-          key={`orbit-${body.planet.id}`}
-          radius={body.orbitUnits}
-          highlight={body.planet.id === 'earth'}
-        />
-      ))}
-      {SOLAR.bodies.map((body) => (
-        <PlanetBody key={body.planet.id} body={body} ring={ring} />
-      ))}
+      <SolarSystemBackdrop glow={glow} />
+      <Earth />
       <OrbitRig onZoomOut={onZoomOut} onLimitChange={onLimitChange} />
     </>
   )
@@ -600,19 +600,12 @@ const OrbitCanvas = memo(function OrbitCanvas({ onZoomOut }) {
     <div className="relative h-full w-full">
       <Canvas
         dpr={[1, 2]}
-        camera={{ fov: 48, position: HOME_CAMERA.toArray(), near: 0.05, far: EXTENT * 90 }}
-        gl={{
-          antialias: true,
-          alpha: false,
-          powerPreference: 'high-performance',
-          logarithmicDepthBuffer: true,
-        }}
-
+        camera={{ fov: 44, position: HOME_CAMERA.toArray(), near: 0.05, far: SKY_RADIUS * 4 }}
+        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       >
         <Scene onZoomOut={onZoomOut} onLimitChange={setAtLimit} />
       </Canvas>
 
-      {/* Outward-scroll affordance: the handoff is a gesture, so it says so. */}
       {atLimit && (
         <div className="pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center px-4">
           <div className="rounded-full border border-white/25 bg-[#04010c]/80 px-3 py-1.5 text-[10px] tracking-[0.16em] text-white/80 uppercase backdrop-blur">
@@ -624,13 +617,13 @@ const OrbitCanvas = memo(function OrbitCanvas({ onZoomOut }) {
   )
 })
 
-export default function SolarSystemOrbitScene({ onZoomOut }) {
+export default function EarthCloseupScene({ onZoomOut }) {
   if (!HAS_WEBGL) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-[#04010c] p-6 text-center">
         <p className="max-w-[300px] text-[12px] leading-relaxed text-ink/65">
-          This browser could not start WebGL, so the Solar System scene cannot draw. Enable
-          hardware acceleration and reload to begin the journey.
+          This browser could not start WebGL, so the Earth view cannot draw. Enable hardware
+          acceleration and reload to begin the journey.
         </p>
       </div>
     )

@@ -1,12 +1,11 @@
-import SolarSystemOrbitScene from './SolarSystemOrbitScene'
+import EarthCloseupScene from './EarthCloseupScene'
 import EarthDossier from './EarthDossier'
-import EarthHomeBadge from './EarthHomeBadge'
 
 /**
- * The opening experience: the Solar System from just above the ecliptic, with
- * Earth marked as home, under the intro copy. "Explore the universe" hands off
- * to the real 3D star map — the same map the header button and the route
- * planner open — so there is one star map, not two.
+ * The opening experience: Earth close up and filling the frame, with the rest
+ * of the Solar System in the sky behind it, under the intro copy. "Explore the
+ * universe" hands off to the real 3D star map — the same map the header button
+ * and the route planner open — so there is one star map, not two.
  */
 export default function EarthOrbitHero({
   onExploreUniverse,
@@ -21,21 +20,18 @@ export default function EarthOrbitHero({
     >
       <div className="relative h-[calc(100svh-140px)] max-h-[920px] min-h-[660px] w-full">
         <div className="absolute inset-0 bg-[#04010c]">
-          <SolarSystemOrbitScene onZoomOut={onExploreUniverse} />
+          <EarthCloseupScene onZoomOut={onExploreUniverse} />
         </div>
 
         {/* top HUD */}
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4 sm:p-6">
           <div>
             <div className="text-[9px] font-semibold tracking-[0.26em] text-white/70 uppercase">
-              Solar System
+              Home world
             </div>
             <div className="mt-1 text-[10px] text-white/40">
-              Sol system · Earth 1 AU from the Sun · orbit spacing compressed for display
+              Sol system · third planet from the Sun · 23.4° axial tilt
             </div>
-          </div>
-          <div className="pointer-events-auto">
-            <EarthHomeBadge />
           </div>
         </div>
 
@@ -75,7 +71,7 @@ export default function EarthOrbitHero({
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-white/45">
-              <span>Drag to orbit · scroll to zoom · Earth sits 1 AU from the Sun</span>
+              <span>Drag to orbit · scroll to zoom</span>
               <span className="hidden sm:inline">
                 Click the scene, then scroll out past the limit for the star map
               </span>
