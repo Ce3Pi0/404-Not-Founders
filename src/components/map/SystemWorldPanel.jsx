@@ -138,6 +138,7 @@ export default function SystemWorldPanel({
               : 'Surface texture and colour are a visual interpretation generated from bulk estimates — not real imagery.'}{' '}
             Orbits are circular, at the archive's semi-major axis, with illustrative starting
             phases: not a present-day ephemeris.
+            {system?.compressed && ' Drawn orbit spacing is compressed so every world stays visible.'}
           </p>
         </>
       ) : (

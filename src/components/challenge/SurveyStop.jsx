@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import PlanetaryScene from '../map/PlanetaryScene'
 import { SYSTEMS, planetById } from '../../lib/catalog'
-import { buildPlanetSystem, daysPerSecond, formatAu, systemFraming } from '../../lib/planetSystem'
+import {
+  buildPlanetSystem,
+  daysPerSecond,
+  formatAu,
+  systemFraming,
+  systemReferencePeriodDays,
+} from '../../lib/planetSystem'
 import { classifyPlanet } from '../../lib/planet'
 import { CHALLENGE_PATHS, navigate } from '../../lib/router'
 import { useChallengeStore, useExpedition } from '../../store/challengeStore'
@@ -174,7 +180,7 @@ export default function SurveyStop() {
               focus={focus}
               orbitsOn
               labelsOn={false}
-              timeScale={daysPerSecond(0.5)}
+              timeScale={daysPerSecond(0.5, systemReferencePeriodDays(system))}
               paused={false}
               labelsRef={labelsRef}
               scaleBarRef={scaleBarRef}

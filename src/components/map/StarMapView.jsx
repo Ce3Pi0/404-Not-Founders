@@ -337,7 +337,7 @@ export default function StarMapView({
 
         {/* selected system */}
         {selected && (
-          <div className="pointer-events-none absolute top-[60px] right-3 z-30 max-h-[calc(100%-180px)] w-[318px] max-lg:inset-x-3 max-lg:top-auto max-lg:bottom-3 max-lg:w-auto max-lg:max-h-[52%]">
+          <div className="pointer-events-none absolute top-[60px] right-3 z-30 flex max-h-[calc(100%-180px)] w-[318px] max-lg:inset-x-3 max-lg:top-auto max-lg:bottom-3 max-lg:w-auto max-lg:max-h-[52%]">
             <SystemPanel
               entry={selected}
               activePlanet={activePlanet}

@@ -5,7 +5,13 @@ import SystemWorldPanel from './SystemWorldPanel'
 import OrientationGizmo from './OrientationGizmo'
 import { formatNumber } from '../../lib/physics'
 import { entryIsSolar, mapDistanceLy, mapSystemFor } from '../../lib/starMap'
-import { buildPlanetSystem, daysPerSecond, formatSimSpeed, systemFraming } from '../../lib/planetSystem'
+import {
+  buildPlanetSystem,
+  daysPerSecond,
+  formatSimSpeed,
+  systemFraming,
+  systemReferencePeriodDays,
+} from '../../lib/planetSystem'
 
 /**
  * `/system/:id` — the Star System Explorer.
@@ -25,6 +31,7 @@ export default function SystemView({
 }) {
   const system = useMemo(() => buildPlanetSystem(entry), [entry])
   const framing = useMemo(() => systemFraming(system), [system])
+  const referencePeriod = useMemo(() => systemReferencePeriodDays(system), [system])
   const originEntry = useMemo(() => mapSystemFor(origin), [origin])
 
   const [selectedId, setSelectedId] = useState(initialPlanetId ?? null)
@@ -64,7 +71,7 @@ export default function SystemView({
     [system],
   )
 
-  const timeScale = daysPerSecond(speedPosition)
+  const timeScale = daysPerSecond(speedPosition, referencePeriod)
 
   if (!entry || !system) {
     return (
@@ -108,8 +115,10 @@ export default function SystemView({
           </h1>
           <p className="mt-1 text-[11px] text-ink/65">
             {formatNumber(entry.planets.length, 0)} known world
-            {entry.planets.length === 1 ? '' : 's'} · {system.placedCount} on the rings · local
-            scale in AU
+            {entry.planets.length === 1 ? '' : 's'} · {system.placedCount} on the rings ·{' '}
+            {system.compressed
+              ? 'orbit spacing compressed for display'
+              : 'local scale in AU'}
             {fromHere != null && fromHere > 0 && (
               <span className="text-ink/45"> · {formatNumber(fromHere, 2)} ly from {origin?.name}</span>
             )}
@@ -196,19 +205,30 @@ export default function SystemView({
 
             {/* local scale — the system scene measures AU, never light-years */}
             <div className="pointer-events-none absolute top-3 left-3 z-20 rounded-xl border border-line/45 bg-void/85 px-3 py-2 backdrop-blur">
-              <div className="flex items-center gap-2">
-                <div ref={scaleBarRef} className="h-px bg-white/70" style={{ width: 120 }} />
-                <span
-                  ref={scaleTextRef}
-                  data-testid="system-scale-readout"
-                  className="num text-[10px] text-ink/85"
-                >
-                  —
-                </span>
-              </div>
-              <div className="mt-1 text-[8px] tracking-[0.16em] text-ink/45 uppercase">
-                AU · linear · 1 unit = 1 AU
-              </div>
+              {system.compressed ? (
+                <>
+                  <div className="text-[10px] text-ink/85">Orbit spacing compressed</div>
+                  <div className="mt-1 text-[8px] tracking-[0.16em] text-ink/45 uppercase">
+                    real AU in the panel
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div ref={scaleBarRef} className="h-px bg-white/70" style={{ width: 120 }} />
+                    <span
+                      ref={scaleTextRef}
+                      data-testid="system-scale-readout"
+                      className="num text-[10px] text-ink/85"
+                    >
+                      —
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[8px] tracking-[0.16em] text-ink/45 uppercase">
+                    AU · linear · 1 unit = 1 AU
+                  </div>
+                </>
+              )}
             </div>
 
             {/* simulation time */}
@@ -247,7 +267,7 @@ export default function SystemView({
                 </div>
               </div>
               <div className="mt-1 text-[8px] text-ink/40">
-                orbit rates from pl_orbper · starting phases illustrative
+                rate ratios from pl_orbper · clock scaled per system · phases illustrative
               </div>
             </div>
 
