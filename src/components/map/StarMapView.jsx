@@ -37,6 +37,7 @@ export default function StarMapView({
   onSetOrigin,
   onExit,
   onExplore,
+  onStartChallenge,
 }) {
   const [selected, setSelected] = useState(() =>
     mapSystemNamed(viewState?.current?.selected ?? null),
@@ -263,6 +264,16 @@ export default function StarMapView({
 
         {/* controls */}
         <div className="pointer-events-auto absolute top-3 right-3 z-20 flex gap-2">
+          {onStartChallenge && (
+            <button
+              type="button"
+              className="btn border-[#5ee7ff]/60 bg-[#5ee7ff]/12 px-3 py-1.5 text-[11px] text-[#c9f7ff] hover:border-[#5ee7ff]"
+              onClick={onStartChallenge}
+              data-testid="start-expedition-challenge-map"
+            >
+              Start expedition challenge →
+            </button>
+          )}
           <button
             type="button"
             className="btn bg-void/80 px-3 py-1.5 text-[11px]"

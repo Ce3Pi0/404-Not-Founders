@@ -106,6 +106,88 @@ function MarkerPoints({ entries, glow, color, size, opacity = 0.95 }) {
   )
 }
 
+/**
+ * Expedition Challenge itinerary: one glowing tube per interstellar leg with a
+ * direction arrow, coloured by leg state. Positions are exact catalogue
+ * coordinates in light-years, so the drawn length is the flown distance.
+ */
+const PATH_COLORS = {
+  planned: '#5ee7ff',
+  current: '#c084fc',
+  done: '#eafdff',
+  failed: '#ff7a45',
+  remaining: '#6a5a8f',
+}
+
+function ExpeditionPath({ segments }) {
+  const objects = useMemo(() => {
+    return segments
+      .map((segment) => {
+        const a = new THREE.Vector3(...segment.from)
+        const b = new THREE.Vector3(...segment.to)
+        const length = a.distanceTo(b)
+        if (!Number.isFinite(length) || length <= 0) return null
+        const color = PATH_COLORS[segment.status] ?? PATH_COLORS.planned
+        const radius = Math.min(0.5, Math.max(0.06, length * 0.0025))
+        const tube = new THREE.TubeGeometry(
+          new THREE.LineCurve3(a, b),
+          1,
+          radius,
+          8,
+          false,
+        )
+        const material = new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: segment.status === 'remaining' ? 0.45 : 0.62,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        })
+        const mesh = new THREE.Mesh(tube, material)
+
+        const direction = b.clone().sub(a).normalize()
+        const arrowSize = Math.min(1.1, Math.max(0.16, length * 0.02))
+        const arrow = new THREE.Mesh(
+          new THREE.ConeGeometry(arrowSize * 0.34, arrowSize, 12),
+          new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity: 0.9,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          }),
+        )
+        arrow.position.copy(a).lerp(b, 0.55)
+        arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction)
+        return { mesh, arrow }
+      })
+      .filter(Boolean)
+  }, [segments])
+
+  useEffect(
+    () => () => {
+      for (const { mesh, arrow } of objects) {
+        mesh.geometry.dispose()
+        mesh.material.dispose()
+        arrow.geometry.dispose()
+        arrow.material.dispose()
+      }
+    },
+    [objects],
+  )
+
+  return (
+    <>
+      {objects.map(({ mesh, arrow }, index) => (
+        <group key={index}>
+          <primitive object={mesh} />
+          <primitive object={arrow} />
+        </group>
+      ))}
+    </>
+  )
+}
+
 /** Solar System: a distinct glowing origin with a mapped reference ring. */
 function SolarOrigin({ glow }) {
   const [x, y, z] = SOLAR_SYSTEM.renderPosition
@@ -408,6 +490,7 @@ function SceneRig({
   onSelect,
   onHover,
   routeGlow = false,
+  routePath = null,
   ship = null,
   shipAnchorRef = null,
   view = null,
@@ -705,6 +788,7 @@ function SceneRig({
       {selected && <SelectedHalo entry={selected} haloTexture={haloTexture} glow={glow} />}
       <SolarOrigin glow={glow} />
       {route && <RouteLine from={route.from} to={route.to} glow={routeGlow} />}
+      {routePath && routePath.length > 0 && <ExpeditionPath segments={routePath} />}
       {ship && <ShipMarker ship={ship} glow={glow} />}
       {distanceTo && <DistanceLine from={distanceTo.from} to={distanceTo.to} />}
     </>
@@ -731,6 +815,7 @@ export default function UniverseScene({
   onSelect,
   onHover,
   routeGlow,
+  routePath,
   ship,
   shipAnchorRef,
   view,
@@ -776,6 +861,7 @@ export default function UniverseScene({
         onSelect={onSelect}
         onHover={onHover}
         routeGlow={routeGlow}
+        routePath={routePath}
         ship={ship}
         shipAnchorRef={shipAnchorRef}
         view={view}

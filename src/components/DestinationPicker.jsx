@@ -120,6 +120,7 @@ export default function DestinationPicker({
   onContinue,
   onGoHome,
   onOpenMap,
+  onStartChallenge,
 }) {
   const departureSuggestions = useMemo(
     () => [EARTH, ...nearbyPlanets(EARTH, 6).filter((entry) => entry.id !== origin.id)],
@@ -156,6 +157,31 @@ export default function DestinationPicker({
           two systems' real coordinates.
         </p>
       </div>
+
+      {onStartChallenge && (
+        <button
+          type="button"
+          onClick={onStartChallenge}
+          data-testid="start-expedition-challenge"
+          className="group w-full rounded-xl border border-[#5ee7ff]/45 bg-[#5ee7ff]/8 px-4 py-3 text-left transition hover:border-[#5ee7ff]/80 hover:bg-[#5ee7ff]/15"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[9px] tracking-[0.18em] text-[#5ee7ff] uppercase">
+                New game mode
+              </div>
+              <div className="mt-0.5 text-[13px] font-semibold text-white">
+                Start expedition challenge
+              </div>
+              <div className="mt-0.5 text-[10px] text-ink/55">
+                Multiple real exoplanets · one propulsion budget · one Earth clock · still come
+                home
+              </div>
+            </div>
+            <span className="text-[18px] text-[#5ee7ff]">→</span>
+          </div>
+        </button>
+      )}
 
       <div className="space-y-3">
         <PlanetSearch
