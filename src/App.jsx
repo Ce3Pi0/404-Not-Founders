@@ -353,6 +353,7 @@ export default function App() {
           <div className="space-y-4">
             <EarthOrbitHero
               onExploreUniverse={exploreUniverse}
+              onSelectPlanet={viewPlanet}
               onStartChallenge={() => navigate(CHALLENGE_PATHS.intro)}
               onPlanRoute={() =>
                 document.getElementById('route-planner')?.scrollIntoView({

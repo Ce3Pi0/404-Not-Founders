@@ -7,14 +7,15 @@
 // them separate means any future compression is explicit, and distances are
 // always measured from `mapPosition`, never from drawn coordinates.
 
-import { EARTH, MAPPED_SYSTEMS, SYSTEMS } from './catalog'
+import { EARTH, MAPPED_SYSTEMS, SYSTEMS, isSolarWorld } from './catalog'
+import { LABEL_LIMIT, PERSISTENT_LABEL_NAMES, labelSystems as composeLabels } from './mapLabels'
 
 /** Nearest region drawn by this first version of the map. */
 export const MAP_REGION_LY = 150
 /** Linear scale: one Three.js unit is one light-year. */
 export const LY_PER_UNIT = 1
 /** Cap on projected HTML name labels. */
-export const LABEL_LIMIT = 12
+export { LABEL_LIMIT, PERSISTENT_LABEL_NAMES }
 
 function toEntry(system) {
   return {
@@ -48,17 +49,17 @@ export const MAPPED_ENTRIES = MAPPED_SYSTEMS.map(toEntry)
 /** Map entry for the host star of any planet, including beyond the region. */
 export function travelSystemFor(planet) {
   if (!planet) return null
-  if (planet.kind === 'earth' || planet.star === 'Solar System') return SOLAR_SYSTEM
+  if (isSolarWorld(planet)) return SOLAR_SYSTEM
   const system = SYSTEMS.get(planet.star)
   return system?.mapPosition ? toEntry(system) : null
 }
 
 const BY_NAME = new Map(REGION_SYSTEMS.map((system) => [system.name, system]))
 
-/** Region entry for a host star, or the Solar System entry for Earth. */
+/** Region entry for a host star, or the Solar System entry for any Solar world. */
 export function mapSystemFor(planet) {
   if (!planet) return null
-  if (planet.kind === 'earth' || planet.star === 'Solar System') return SOLAR_SYSTEM
+  if (isSolarWorld(planet)) return SOLAR_SYSTEM
   return BY_NAME.get(planet.star) ?? null
 }
 
@@ -142,28 +143,22 @@ export function nearestSystems(entry, limit = LABEL_LIMIT) {
 }
 
 /**
- * Names shown on the map: the Solar System origin, the selected and hovered
- * systems, the current route, then the closest mapped neighbours of the focus.
- * Capped so the HTML overlay never becomes a wall of text.
+ * Names shown on the map: the inspected and hovered systems, the current route,
+ * and the persistent landmarks (GJ 1061) always come first and are never
+ * dropped by the cap; the closest mapped neighbours fill what is left. See
+ * lib/mapLabels.js for the ordering rules.
  */
 export function labelSystems({ selected, hovered, origin, destination }) {
   const focus = selected ?? origin ?? SOLAR_SYSTEM
-  const out = []
-  const seen = new Set()
-  const push = (entry) => {
-    if (!entry || seen.has(entry.name) || out.length >= LABEL_LIMIT) return
-    seen.add(entry.name)
-    out.push(entry)
-  }
-
-  if (entryIsSolar(focus)) push(SOLAR_SYSTEM)
-  push(selected)
-  push(hovered)
-  push(origin)
-  push(destination)
-  for (const system of nearestSystems(focus)) push(system)
-
-  return out
+  return composeLabels({
+    selected: entryIsSolar(focus) ? SOLAR_SYSTEM : selected,
+    hovered,
+    origin,
+    destination,
+    focusIsSolar: entryIsSolar(focus),
+    nearby: nearestSystems(focus),
+    persistent: PERSISTENT_LABEL_NAMES.map((name) => BY_NAME.get(name)).filter(Boolean),
+  })
 }
 
 export function entryIsSolar(entry) {

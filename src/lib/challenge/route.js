@@ -10,7 +10,7 @@
 // `ra`/`dec`. Planet orbital separations are a separate local mechanic and are
 // never treated as interstellar distances.
 
-import { PLANETS, SYSTEMS, planetById } from '../catalog'
+import { PLANETS, SYSTEMS, isSolarWorld, planetById } from '../catalog'
 import {
   EARTH_SYSTEM,
   assembleDirectReturnLeg,
@@ -38,7 +38,7 @@ export function hostPosition(systemName) {
 /** Planets the archive places in one host system, innermost first. */
 export function systemPlanets(systemName) {
   return (SYSTEMS.get(systemName)?.planets ?? [])
-    .filter((planet) => planet.kind !== 'earth')
+    .filter((planet) => !isSolarWorld(planet))
     .slice()
     .sort(
       (a, b) =>
@@ -47,14 +47,18 @@ export function systemPlanets(systemName) {
     )
 }
 
-/** True when the archive measured this system's distance, so it can be plotted. */
+/**
+ * True when the archive measured this system's distance, so it can be plotted.
+ * The Solar System is the expedition's home address, never a destination leg.
+ */
 export function systemIsMappable(systemName) {
+  if (!systemName || systemName === EARTH_SYSTEM) return false
   return Boolean(hostPosition(systemName))
 }
 
 /** A planet plus the exact position of its host system, for grouping. */
 export function routeTarget(planet) {
-  if (!planet || planet.kind === 'earth') return null
+  if (!planet || isSolarWorld(planet)) return null
   const position = hostPosition(planet.star)
   if (!position) return null
   return { ...planet, systemName: planet.star, position }
@@ -97,7 +101,7 @@ export function buildExpeditionRoute(planetIds = [], legSpeeds = {}, options = {
 export function buildDirectReturnLeg({ fromSystem, departurePlanetId, index, beta, key, options }) {
   const position = hostPosition(fromSystem)
   const planet = planetById(departurePlanetId)
-  if (!position || !planet || planet.kind === 'earth') return null
+  if (!position || !planet || isSolarWorld(planet)) return null
   return assembleDirectReturnLeg({
     fromSystem,
     fromPosition: position,
@@ -122,5 +126,5 @@ export function mappedSystems() {
 
 /** Catalogued exoplanets that sit in a measured system. */
 export const MAPPABLE_PLANET_COUNT = PLANETS.filter(
-  (planet) => planet.kind !== 'earth' && systemIsMappable(planet.star),
+  (planet) => !isSolarWorld(planet) && systemIsMappable(planet.star),
 ).length

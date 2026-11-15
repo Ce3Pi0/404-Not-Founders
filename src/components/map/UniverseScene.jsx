@@ -6,6 +6,7 @@ import { mulberry32, starColor } from '../../lib/planet'
 import { SOLAR_SYSTEM } from '../../lib/starMap'
 import { HAS_WEBGL } from '../../lib/webgl'
 import { createGlowTexture, createHaloTexture } from '../../lib/glowTexture'
+import { createZoomOutLatch, wheelPixels } from '../../lib/zoomTransition'
 
 import { HOME_CAMERA, HOME_TARGET, EARTH_RETURN_DISTANCE } from '../../lib/mapCamera'
 /** Cyan is the map's signature accent for the inspected system. */
@@ -491,7 +492,6 @@ function SceneRig({
   const controls = useMemo(() => new OrbitControls(camera, gl.domElement), [camera, gl])
   const projection = useMemo(() => new THREE.Vector3(), [])
   const approachArmed = useRef(false)
-  const zoomPull = useRef(0)
   const approachHandler = useRef(onApproachOrigin)
   approachHandler.current = onApproachOrigin
   const hoverAt = useRef(0)
@@ -613,25 +613,19 @@ function SceneRig({
     const interrupt = () => {
       tween.current = null
     }
+    // Inward wheel travel, normalised across wheel units, earns the handoff
+    // once the Solar origin fills the view (lib/zoomTransition.js).
+    const latch = createZoomOutLatch()
     const handleWheel = (event) => {
       tween.current = null
       const handler = approachHandler.current
       if (!handler || !approachArmed.current) {
-        zoomPull.current = 0
+        latch.reset()
         return
       }
       const distance = camera.position.length()
-      if (
-        event.deltaY >= 0 ||
-        distance > EARTH_RETURN_DISTANCE * 3 ||
-        !aimedAtOrigin(12)
-      ) {
-        zoomPull.current = 0
-        return
-      }
-      zoomPull.current += -event.deltaY
-      if (zoomPull.current > 220) {
-        zoomPull.current = 0
+      const ready = distance <= EARTH_RETURN_DISTANCE * 4 && aimedAtOrigin(14)
+      if (latch.push(-wheelPixels(event), ready)) {
         approachArmed.current = false
         handler()
       }
