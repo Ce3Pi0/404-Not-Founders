@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import UniverseScene from './UniverseScene'
+import { HOME_CAMERA, HOME_TARGET } from '../../lib/mapCamera'
 import SystemPanel from './SystemPanel'
 import MapSearch from './MapSearch'
 import OrientationGizmo from './OrientationGizmo'
@@ -38,10 +39,26 @@ export default function StarMapView({
   onExit,
   onExplore,
   onStartChallenge,
+  arrival = null,
+  onReturnToEarth,
 }) {
   const [selected, setSelected] = useState(() =>
     mapSystemNamed(viewState?.current?.selected ?? null),
   )
+  /* Arriving from the Earth scene: open tight on the Solar origin, then pull
+   * the camera back into the full map — the outward half of the transition. */
+  const [bootView, setBootView] = useState(() =>
+    arrival ? { position: [0.9, 0.6, 1.25], target: HOME_TARGET } : null,
+  )
+
+  useEffect(() => {
+    if (!arrival) return undefined
+    const timer = setTimeout(
+      () => setBootView({ position: HOME_CAMERA, target: HOME_TARGET }),
+      420,
+    )
+    return () => clearTimeout(timer)
+  }, [arrival])
   const [hovered, setHovered] = useState(null)
   const [activeId, setActiveId] = useState(null)
   const [resetSignal, setResetSignal] = useState(0)
@@ -178,8 +195,10 @@ export default function StarMapView({
           resetSignal={resetSignal}
           cameraState={cameraState}
           focus={focus}
+          view={bootView}
           onSelect={handleSelect}
           onHover={handleHover}
+          onApproachOrigin={onReturnToEarth}
         />
 
         {/* projected names from the 3D positions */}
@@ -245,7 +264,10 @@ export default function StarMapView({
               </p>
             ))}
             {!selected && (
-              <p className="mt-2 text-[10px] text-ink/55">Click a star to inspect its worlds.</p>
+              <p className="mt-2 text-[10px] text-ink/55">
+              Click a star to inspect its worlds. The Solar System is Earth's address — zoom into it
+              to return to orbit.
+            </p>
             )}
           </div>
 
@@ -281,6 +303,16 @@ export default function StarMapView({
           >
             Reset camera
           </button>
+          {onReturnToEarth && (
+            <button
+              type="button"
+              className="btn bg-void/80 px-3 py-1.5 text-[11px]"
+              onClick={onReturnToEarth}
+              data-testid="return-to-earth-orbit"
+            >
+              Return to Earth
+            </button>
+          )}
           <button type="button" className="btn bg-void/80 px-3 py-1.5 text-[11px]" onClick={onExit}>
             Close map
           </button>
@@ -322,7 +354,7 @@ export default function StarMapView({
 
         {/* orbit / zoom hints */}
         <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 hidden -translate-x-1/2 rounded-full border border-line/40 bg-void/75 px-3 py-1 text-[9px] text-ink/55 backdrop-blur sm:block">
-          Drag to orbit · scroll to zoom · right-drag to pan · click a star
+          Drag to orbit · scroll to zoom · click a star · zoom into the Solar System for Earth
         </div>
 
         {/* 3D orientation indicator */}

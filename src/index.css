@@ -97,6 +97,21 @@
   animation: fade-up 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
+/* Earth orbit <-> star map handoff: a solid cover fades in over the running
+ * scene, the next screen mounts beneath it, and it is removed. */
+@keyframes warp-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.warp-fade {
+  animation: warp-fade 0.64s ease-in both;
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
