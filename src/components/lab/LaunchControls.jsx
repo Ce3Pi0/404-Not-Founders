@@ -66,7 +66,7 @@ export default function LaunchControls({
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="text-[9px] tracking-[0.16em] text-muted uppercase">Ship proper clock</div>
-            <div className="mt-1 text-[24px] leading-none font-semibold text-mint">
+            <div className="mt-1 text-[24px] leading-none font-semibold text-muted/50">
               {clock.years}y {clock.days}d
               <span className="ml-1.5 text-[13px] font-normal text-muted">{clock.hms}</span>
             </div>

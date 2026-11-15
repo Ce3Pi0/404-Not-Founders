@@ -74,17 +74,16 @@ function CameraOption({ camera, active, disabled, onSelect }) {
       }}
       title={camera.detail}
       className={`group flex w-full items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition ${active
-          ? 'border-ion/60 bg-ion/[0.08] text-ink shadow-[0_0_30px_-16px_rgba(94,231,255,0.9)]'
-          : 'border-line/70 bg-white/[0.015] text-muted hover:border-ion/35 hover:text-ink'
+        ? 'border-ion/60  text-ink bg-ion/50'
+        : 'border-line/70 bg-white/[0.015] text-muted hover:border-ion/35 hover:text-ink'
         } ${disabled ? 'cursor-not-allowed opacity-45 hover:border-line/70' : ''}`}
     >
-      <span className={active ? 'shrink-0 text-ion' : 'shrink-0 text-muted/80 group-hover:text-ion/80'}>
+      <span className={active ? 'shrink-0 text-muted/80' : 'shrink-0 text-muted/80 group-hover:text-ion/80'}>
         {camera.icon}
       </span>
       <span className="min-w-0">
         <span className="flex items-center gap-1.5">
           <span className="text-[12px] font-semibold tracking-tight">{camera.label}</span>
-          {active && <span className="h-1.5 w-1.5 rounded-full bg-ion" />}
         </span>
         <span className="mt-0.5 block text-[9px] tracking-[0.08em] text-muted/80 uppercase">
           {camera.blurb}
@@ -165,7 +164,7 @@ export default function CameraMenu({
             step="0.5"
             value={chaseDistance}
             aria-label="Camera distance"
-            className="slider mt-2"
+            className="slider slider-fill mt-2"
             style={{ '--pct': `${((chaseDistance - 4) / 22) * 100}%` }}
             onChange={(event) => onChaseDistanceChange(Number(event.target.value))}
           />
@@ -182,7 +181,7 @@ export default function CameraMenu({
             step="0.01"
             value={cameraAngle}
             aria-label="Viewing angle for the chase camera"
-            className="slider mt-2"
+            className="slider slider-fill mt-2"
             style={{ '--pct': `${((cameraAngle - 0.05) / 1.3) * 100}%` }}
             onChange={(event) => onCameraAngleChange(Number(event.target.value))}
           />
@@ -193,7 +192,7 @@ export default function CameraMenu({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-[12px] font-semibold">Split-screen A / B</span>
-            <span className="rounded-full border border-violet/40 bg-violet/10 px-1.5 py-0.5 text-[9px] tracking-[0.1em] text-violet uppercase">
+            <span className="rounded-full border border-violet/40 bg-violet/10 px-1.5 py-0.5 text-[9px] tracking-[0.1em] text-white/80 uppercase">
               two clocks
             </span>
           </div>
@@ -212,7 +211,7 @@ export default function CameraMenu({
             }`}
         >
           <span
-            className={`absolute h-4 w-4 rounded-full transition-all ${split ? 'left-[24px] bg-ion shadow-[0_0_14px_rgba(94,231,255,0.9)]' : 'left-[3px] bg-muted/70'
+            className={`absolute h-4 w-4 rounded-full transition-all ${split ? 'left-[24px] bg-ion' : 'left-[3px] bg-muted/70'
               }`}
           />
         </button>

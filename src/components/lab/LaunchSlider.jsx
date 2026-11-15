@@ -26,7 +26,7 @@ export default function LaunchSlider({
       </div>
       <input
         type="range"
-        className="slider mt-2"
+        className="slider slider-fill mt-2"
         min={min}
         max={max}
         step={step}

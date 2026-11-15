@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { C_KM_S, formatNumber, formatYears, clamp } from '../lib/physics'
 import { classifyPlanet, describeStar } from '../lib/planet'
+import { useAppStore, useDistanceLy } from '../store/appStore'
 
 const PRESETS = [0.5, 0.8, 0.9, 0.99, 0.999]
 
@@ -45,19 +46,19 @@ function SpeedField({ beta, onChange }) {
   )
 }
 
-export default function FlightPlan({
-  origin,
-  planet,
-  distanceLy,
-  beta,
-  onBetaChange,
-  shipName,
-  onShipNameChange,
-  prediction,
-  onPredictionChange,
-  onLaunch,
-  onBack,
-}) {
+export default function FlightPlan() {
+  const origin = useAppStore((state) => state.location)
+  const planet = useAppStore((state) => state.planet)
+  const distanceLy = useDistanceLy()
+  const beta = useAppStore((state) => state.beta)
+  const shipName = useAppStore((state) => state.shipName)
+  const prediction = useAppStore((state) => state.prediction)
+  const setBeta = useAppStore((state) => state.setBeta)
+  const setShipName = useAppStore((state) => state.setShipName)
+  const setPrediction = useAppStore((state) => state.setPrediction)
+  const launch = useAppStore((state) => state.launch)
+  const goToStep = useAppStore((state) => state.goToStep)
+
   const look = classifyPlanet(planet)
   const star = describeStar(planet)
   const pct = ((beta - 0.05) / (0.999 - 0.05)) * 100
@@ -77,7 +78,7 @@ export default function FlightPlan({
             {star.spectral})
           </p>
         </div>
-        <button type="button" className="btn text-xs" onClick={onBack}>
+        <button type="button" className="btn text-xs" onClick={() => goToStep('destination')}>
           ← Change route
         </button>
       </div>
@@ -115,7 +116,7 @@ export default function FlightPlan({
                 step="0.001"
                 value={beta}
                 aria-label="Max velocity as a fraction of the speed of light"
-                onChange={(event) => onBetaChange(Number(event.target.value))}
+                onChange={(event) => setBeta(Number(event.target.value))}
               />
             </div>
             <div className="mt-1 flex justify-between text-[10px] text-ink/45">
@@ -125,14 +126,14 @@ export default function FlightPlan({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <SpeedField beta={beta} onChange={onBetaChange} />
+            <SpeedField beta={beta} onChange={setBeta} />
             <div className="flex flex-wrap gap-1.5">
               {PRESETS.map((preset) => (
                 <button
                   key={preset}
                   type="button"
                   className={`chip ${Math.abs(preset - beta) < 0.0005 ? 'border-ion text-white' : ''}`}
-                  onClick={() => onBetaChange(preset)}
+                  onClick={() => setBeta(preset)}
                 >
                   {preset} c
                 </button>
@@ -147,7 +148,7 @@ export default function FlightPlan({
               value={shipName}
               maxLength={28}
               aria-label="Spacecraft name"
-              onChange={(event) => onShipNameChange(event.target.value)}
+              onChange={(event) => setShipName(event.target.value)}
             />
             <p className="mt-2 text-[11px] leading-relaxed text-ink/55">
               Constant velocity for this draft. Acceleration and deceleration phases are the next
@@ -178,7 +179,7 @@ export default function FlightPlan({
                   placeholder="e.g. 4.7"
                   className="field num"
                   value={prediction.earth}
-                  onChange={(event) => onPredictionChange({ ...prediction, earth: event.target.value })}
+                  onChange={(event) => setPrediction({ earth: event.target.value })}
                 />
               </div>
               <div>
@@ -193,7 +194,7 @@ export default function FlightPlan({
                   placeholder="e.g. 2.0"
                   className="field num"
                   value={prediction.ship}
-                  onChange={(event) => onPredictionChange({ ...prediction, ship: event.target.value })}
+                  onChange={(event) => setPrediction({ ship: event.target.value })}
                 />
               </div>
             </div>
@@ -233,7 +234,7 @@ export default function FlightPlan({
               </div>
             </dl>
 
-            <button type="button" className="btn btn-primary mt-4 w-full" onClick={onLaunch}>
+            <button type="button" className="btn btn-primary mt-4 w-full" onClick={launch}>
               Launch {shipName.trim() || 'mission'} →
             </button>
           </div>

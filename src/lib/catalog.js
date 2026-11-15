@@ -1,4 +1,5 @@
 import csvText from "../data/exoplanets.csv?raw";
+import { EARTH } from "./earth";
 import { hashString, mulberry32 } from "./planet";
 
 export const LY_PER_PC = 3.26156;
@@ -133,28 +134,6 @@ function deriveBulk(name, eqTempK) {
   };
 }
 
-export const EARTH = {
-  id: "earth",
-  name: "Earth",
-  star: "Solar System",
-  kind: "earth",
-  distancePc: 0,
-  distanceLy: 0,
-  ra: 0,
-  dec: 0,
-  semiMajorAxisAu: 1,
-  orbitalPeriodDays: 365.25,
-  radiusEarth: 1,
-  massEarth: 1,
-  densityGcc: 5.51,
-  eqTempK: 255,
-  starMassSun: 1,
-  starRadiusSun: 1,
-  starTeffK: 5772,
-  starLuminositySun: 1,
-  position: [0, 0, 0],
-};
-
 const EXOPLANETS = lines
   .filter((line) => cell(line, "pl_name") && cell(line, "hostname"))
   .map((line, index) => {
@@ -198,7 +177,7 @@ const EXOPLANETS = lines
     };
   });
 
-export const PLANETS = [EARTH, ...EXOPLANETS];
+export const PLANETS = [...EXOPLANETS];
 export const BY_ID = new Map(PLANETS.map((planet) => [planet.id, planet]));
 export const BY_NAME = new Map(PLANETS.map((planet) => [planet.name, planet]));
 
@@ -238,6 +217,20 @@ export const SYSTEMS = (() => {
   return map;
 })();
 
+/**
+ * Worlds normally carry a precomputed `position`, but not every synthetic
+ * station does (e.g. Earth). Fall back to building the vector from the
+ * catalog coordinates so a missing cache can never break a render.
+ */
+const vectorOf = (planet) =>
+  Array.isArray(planet?.position)
+    ? planet.position
+    : positionVector(
+        planet?.ra ?? 0,
+        planet?.dec ?? 0,
+        planet?.distancePc ?? 0,
+      );
+
 /** Great-unknown route length between two worlds, in light-years. */
 export function distanceLyBetween(from, to) {
   if (!from || !to) return 0;
@@ -248,8 +241,8 @@ export function distanceLyBetween(from, to) {
     if (a == null || b == null) return 0.00001;
     return Math.max(0.00001, Math.abs(a - b) * LY_PER_AU);
   }
-  const [ax, ay, az] = from.position;
-  const [bx, by, bz] = to.position;
+  const [ax, ay, az] = vectorOf(from);
+  const [bx, by, bz] = vectorOf(to);
   return Math.hypot(ax - bx, ay - by, az - bz) * LY_PER_PC;
 }
 
@@ -302,6 +295,7 @@ export function searchPlanets(query, limit = 16) {
   return [...starts, ...contains].slice(0, limit);
 }
 
+/** The world offered as the destination before the user picks a route. */
 export const DEFAULT_PLANET =
   BY_NAME.get("TRAPPIST-1 e") ??
   RECOMMENDED[0] ??

@@ -1,28 +1,29 @@
 import { useMemo } from 'react'
 import {
-  EARTH,
   RECOMMENDED,
   distanceLyBetween,
   nearbyPlanets,
 } from '../lib/catalog'
+import { EARTH } from '../lib/earth'
 import { classifyPlanet, describeStar } from '../lib/planet'
 import { formatNumber, formatYears, surfaceGravity } from '../lib/physics'
+import { useAppStore, useDistanceLy } from '../store/appStore'
 import PlanetSearch from './PlanetSearch'
 
 const R_JUPITER = 11.21
 const M_JUPITER = 317.8
 
-function Fact({ label, value, sub }) {
+function Fact({ label, value, sub, subSymbolEarth, subSymbolJupiter }) {
   return (
     <div className="bg-panel/25 px-3.5 py-3">
       <div className="text-[9px] tracking-[0.16em] text-ink/50 uppercase">{label}</div>
-      <div className="mt-1 text-[13px] text-ink">{value}</div>
-      {sub && <div className="mt-0.5 text-[10px] text-ink/50">{sub}</div>}
+      {value !== "—" && <div className="mt-1 text-[13px] text-ink">{value}<sub>{subSymbolEarth ?? ""}</sub></div>}
+      {sub && <div className="mt-0.5 text-[10px] text-ink/50">{sub}<sub>{subSymbolJupiter ?? ""}</sub></div>}
     </div>
   )
 }
 
-function PlanetFacts({ planet, origin, distanceLy }) {
+function PlanetFacts({ planet, distanceLy }) {
   const look = classifyPlanet(planet)
   const star = describeStar(planet)
   const gravity = surfaceGravity(planet.massEarth, planet.radiusEarth)
@@ -56,13 +57,17 @@ function PlanetFacts({ planet, origin, distanceLy }) {
         />
         <Fact
           label="Radius"
-          value={planet.radiusEarth != null ? `${formatNumber(planet.radiusEarth, 2)} R⊕` : '—'}
-          sub={radiusJupiter != null ? `${formatNumber(radiusJupiter, 2)} R♃` : null}
+          value={planet.radiusEarth != null ? `${formatNumber(planet.radiusEarth, 2)} R` : '—'}
+          sub={radiusJupiter != null ? `${formatNumber(radiusJupiter, 2)} R` : null}
+          subSymbolEarth="⊕"
+          subSymbolJupiter="♃"
         />
         <Fact
           label="Mass"
-          value={planet.massEarth != null ? `${formatNumber(planet.massEarth, 2)} M⊕` : '—'}
-          sub={massJupiter != null && massJupiter > 0.05 ? `${formatNumber(massJupiter, 2)} M♃` : null}
+          value={planet.massEarth != null ? `${formatNumber(planet.massEarth, 2)} M` : '—'}
+          sub={massJupiter != null && massJupiter > 0.05 ? `${formatNumber(massJupiter, 2)} M` : null}
+          subSymbolEarth="⊕"
+          subSymbolJupiter="♃"
         />
         <Fact
           label="Equilibrium temp"
@@ -100,9 +105,10 @@ function PlanetFacts({ planet, origin, distanceLy }) {
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-ink/55">
           {look.evidence}
-          <span className="text-ink/80">
+          <br />
+          <span className="text-ink/30 text-[9px]">
             {' '}
-            Bulk properties and colours are estimates — the CSV archive supplies orbits and
+            *Bulk properties and colours are estimates — the CSV archive supplies orbits and
             positions only.
           </span>
         </p>
@@ -111,17 +117,17 @@ function PlanetFacts({ planet, origin, distanceLy }) {
   )
 }
 
-export default function DestinationPicker({
-  origin,
-  planet,
-  distanceLy,
-  onOriginChange,
-  onSelect,
-  onContinue,
-  onGoHome,
-}) {
+export default function DestinationPicker() {
+  const origin = useAppStore((state) => state.location)
+  const planet = useAppStore((state) => state.planet)
+  const distanceLy = useDistanceLy()
+  const selectOrigin = useAppStore((state) => state.selectOrigin)
+  const selectPlanet = useAppStore((state) => state.selectPlanet)
+  const goToStep = useAppStore((state) => state.goToStep)
+  const goHome = useAppStore((state) => state.goHome)
+
   const departureSuggestions = useMemo(
-    () => [EARTH, ...nearbyPlanets(EARTH, 6).filter((entry) => entry.id !== origin.id)],
+    () => [EARTH, ...nearbyPlanets(EARTH, 6)].filter((entry) => entry.id !== origin.id),
     [origin.id],
   )
   const destinationSuggestions = useMemo(
@@ -131,14 +137,14 @@ export default function DestinationPicker({
 
   const chooseDestination = (next) => {
     if (next.id === origin.id) return
-    onSelect(next)
+    selectPlanet(next)
   }
 
   const chooseOrigin = (next) => {
-    onOriginChange(next)
+    selectOrigin(next)
     if (next.id === planet.id) {
       const replacement = nearbyPlanets(next, 6).find((entry) => entry.id !== next.id)
-      if (replacement) onSelect(replacement)
+      if (replacement) selectPlanet(replacement)
     }
   }
 
@@ -163,8 +169,8 @@ export default function DestinationPicker({
           value={origin}
           onSelect={chooseOrigin}
           suggestions={departureSuggestions}
-          distanceFor={(entry) => distanceLyBetween(EARTH, entry)}
-          distanceLabel="from Earth"
+          distanceFor={(entry) => distanceLyBetween(origin, entry)}
+          distanceLabel="from here"
           placeholder="Search any system to depart from"
         />
         <PlanetSearch
@@ -208,14 +214,14 @@ export default function DestinationPicker({
         </div>
       </div>
 
-      <PlanetFacts planet={planet} origin={origin} distanceLy={distanceLy} />
+      <PlanetFacts planet={planet} distanceLy={distanceLy} />
 
       <div className="mt-auto space-y-2">
-        <button type="button" className="btn btn-primary w-full" onClick={() => onContinue(planet)}>
+        <button type="button" className="btn btn-primary w-full" onClick={() => goToStep('flight')}>
           Continue to flight plan →
         </button>
-        {origin.kind !== 'earth' && onGoHome && (
-          <button type="button" className="btn w-full" onClick={onGoHome}>
+        {origin.kind !== 'earth' && (
+          <button type="button" className="btn w-full" onClick={goHome}>
             ← Go home to Earth
           </button>
         )}
