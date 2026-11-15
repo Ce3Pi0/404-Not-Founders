@@ -156,6 +156,12 @@ export default function App() {
     navigate(`/system/${systemId(entry)}`)
   }
 
+  /** "← Back to Universe" always returns to the 3D star map, not the picker. */
+  const backToUniverse = () => {
+    navigate('/')
+    setStepState('map')
+  }
+
   // Star System Explorer deep links.
   const viewPlanet = (next) => {
     if (!next) return
@@ -239,7 +245,7 @@ export default function App() {
               entry={pathSystem}
               origin={location}
               initialPlanetId={mapViewState.current.planetId}
-              onBack={() => goTo('destination')}
+              onBack={backToUniverse}
               onViewPlanet={viewPlanet}
               onPlanTravel={planTravel}
             />
@@ -260,7 +266,7 @@ export default function App() {
             planet={planet}
             origin={location}
             distanceLy={distanceLy}
-            onBack={() => goTo('destination')}
+            onBack={backToUniverse}
             onBackToSystem={() => backToSystem(planet)}
             onPlanTravel={planTravel}
           />

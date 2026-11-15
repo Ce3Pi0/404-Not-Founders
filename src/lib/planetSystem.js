@@ -75,7 +75,9 @@ export function buildPlanetSystem(entry) {
   const extentAu = placed.length
     ? placed[placed.length - 1].semiMajorAxisAu
     : 0.5
-  const reference = placed[0] ?? entry.planets[0]
+  // The host star is one object: use the same row the inspector reads, so the
+  // drawn colour and the reported spectral class never disagree.
+  const reference = entry.planets[0] ?? placed[0]
   const starRadiusSun = reference?.starRadiusSun ?? 1
 
   const star = {
