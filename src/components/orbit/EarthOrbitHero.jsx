@@ -1,5 +1,6 @@
 import SolarSystemOrbitScene from './SolarSystemOrbitScene'
 import EarthDossier from './EarthDossier'
+import EarthHomeBadge from './EarthHomeBadge'
 
 /**
  * The opening experience: the Solar System from just above the ecliptic, with
@@ -33,9 +34,8 @@ export default function EarthOrbitHero({
               Sol system · Earth 1 AU from the Sun · orbit spacing compressed for display
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-line/60 bg-[#04010c]/70 px-3 py-1 text-[10px] text-white/70 backdrop-blur">
-            <span className="pulse-soft h-1.5 w-1.5 rounded-full bg-ion" />
-            Earth · you are here
+          <div className="pointer-events-auto">
+            <EarthHomeBadge />
           </div>
         </div>
 

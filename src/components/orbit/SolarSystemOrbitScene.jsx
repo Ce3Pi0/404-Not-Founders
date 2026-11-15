@@ -401,7 +401,9 @@ function PlanetBody({ body, ring }) {
     if (spin.current) spin.current.rotation.y += delta * 0.09
   })
 
-  const radius = body.radiusUnits
+  // Earth is drawn slightly above its slot size so the home world can be picked
+  // out on its orbit; every size here is illustrative (see the scale note).
+  const radius = body.radiusUnits * (isEarth ? 1.7 : 1)
 
   return (
     <group ref={orbit}>
