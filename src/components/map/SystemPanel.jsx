@@ -110,7 +110,7 @@ export default function SystemPanel({
         </ul>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="sticky bottom-0 -mx-4 -mb-4 space-y-1.5 rounded-b-2xl border-t border-line/40 bg-void/90 px-4 pt-2 pb-4 backdrop-blur">
         <button
           type="button"
           className="btn w-full border-cyan-300/50 py-2 text-[12px] hover:border-cyan-200/70"
