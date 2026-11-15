@@ -60,37 +60,16 @@ function ProgressBar({ progress }) {
 /* ----------------------------------------------------------------- overlays -- */
 
 function CockpitOverlay({ telemetry }) {
-  const speedPct = Math.min(100, telemetry.percentC)
-  const gPct = Math.min(100, (telemetry.gForce / 6) * 100)
   return (
     <div className="pointer-events-none absolute inset-0">
-      <div className="absolute inset-0 bg-[radial-gradient(80%_80%_at_50%_50%,transparent_55%,rgba(3,5,9,0.6)_100%)]" />
-      <div className="absolute top-1/2 left-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border border-ion/20">
-        <div className="absolute top-1/2 left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ion/90 shadow-[0_0_12px_rgba(94,231,255,0.9)]" />
-        <div className="absolute top-1/2 left-1/2 h-px w-20 -translate-x-1/2 -translate-y-1/2 bg-ion/25" />
-        <div className="absolute top-1/2 left-1/2 h-20 w-px -translate-x-1/2 -translate-y-1/2 bg-ion/25" />
-      </div>
-
-      <div className="absolute inset-x-3 bottom-3 grid grid-cols-3 gap-2 rounded-xl border border-ion/25 bg-void/85 px-3 py-2 backdrop-blur">
-        <div>
-          <div className="text-[8px] tracking-[0.14em] text-muted uppercase">Velocity</div>
-          <div className="text-[11px] text-ink">{formatPercentC(telemetry.percentC)} c</div>
-          <div className="mt-1 h-1 rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-ion/80" style={{ width: `${speedPct}%` }} />
-          </div>
-        </div>
-        <div>
-          <div className="text-[8px] tracking-[0.14em] text-muted uppercase">G-force</div>
-          <div className="text-[11px] text-solar">{telemetry.gForce.toFixed(2)} g</div>
-          <div className="mt-1 h-1 rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-solar/80" style={{ width: `${gPct}%` }} />
-          </div>
-        </div>
-        <div>
-          <div className="text-[8px] tracking-[0.14em] text-muted uppercase">Fuel</div>
-          <div className="text-[11px] text-mint">{Math.round(telemetry.fuelFraction * 100)}%</div>
-          <div className="mt-1 h-1 rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-mint/80" style={{ width: `${telemetry.fuelFraction * 100}%` }} />
+      <div className="absolute w-full bottom-3 ">
+        <div className="flex justify-center">
+          <div className="w-fit rounded-xl border border-ion/25 bg-void/85 px-12 py-2 backdrop-blur">
+            <div className="text-[8px] tracking-[0.14em] text-muted uppercase">Fuel</div>
+            <div className="text-[11px] text-mint">{Math.round(telemetry.fuelFraction * 100)}%</div>
+            <div className="mt-1 h-1 rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-mint/80" style={{ width: `${telemetry.fuelFraction * 100}%` }} />
+            </div>
           </div>
         </div>
       </div>
@@ -111,7 +90,7 @@ function BirdOverlay({ telemetry, route }) {
         <div className="text-[11px] font-medium text-ink">{route.endPlanet?.name}</div>
         <div className="text-[9px] text-muted">{formatNumber(telemetry.remainingLy, 2)} ly to go</div>
       </div>
-      <div className="absolute inset-x-6 bottom-4">
+      <div className="absolute inset-x-6 bottom-20">
         <div className="flex items-center justify-between text-[8px] tracking-[0.16em] text-muted uppercase">
           <span>launch</span>
           <span className="text-ion">{Math.round(telemetry.fraction * 100)}% of route</span>
@@ -120,7 +99,7 @@ function BirdOverlay({ telemetry, route }) {
         <div className="relative mt-1.5 h-1 rounded-full bg-white/10">
           <div className="h-full rounded-full bg-ion/70" style={{ width: `${telemetry.fraction * 100}%` }} />
           <div
-            className="absolute -top-1 h-3 w-3 -translate-x-1/2 rounded-full border border-void bg-ion shadow-[0_0_10px_rgba(94,231,255,0.9)]"
+            className="absolute -top-1 h-3 w-3 -translate-x-1/2 rounded-full border border-void bg-ion"
             style={{ left: `${telemetry.fraction * 100}%` }}
           />
         </div>
@@ -175,14 +154,13 @@ function SplitPanel({ side, view, onViewChange, telemetry, route, playing, chase
         <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-2">
           <div>
             <div className="flex items-center gap-2">
-              <span className={`h-1.5 w-1.5 rounded-full ${data.dot}`} />
               <span className="label text-[9px]">{data.title}</span>
             </div>
             <div className="mt-0.5 text-[15px] leading-tight font-semibold tracking-tight">{data.station}</div>
             <div className="mt-0.5 text-[9px] tracking-[0.08em] text-muted uppercase">{data.frame}</div>
           </div>
           <div className={`rounded-lg border px-2.5 py-1.5 text-right ${data.accent}`}>
-            <div className="text-[8px] tracking-[0.14em] uppercase opacity-80">Local elapsed time</div>
+            <div className="text-white/80 text-[8px] tracking-[0.14em] uppercase opacity-80">Local elapsed time</div>
             <div className="mt-0.5">
               <Clock years={data.clockYears} size="text-[15px]" tone="" />
             </div>
@@ -193,6 +171,7 @@ function SplitPanel({ side, view, onViewChange, telemetry, route, playing, chase
           <div className="pointer-events-auto flex items-center justify-between gap-2 rounded-lg border border-line/70 bg-void/85 px-2.5 py-1.5 backdrop-blur">
             <span className="text-[9px] tracking-[0.12em] text-muted uppercase">Camera</span>
             <select
+              name={`camera-${side}`}
               value={view}
               aria-label={`Camera for Point ${side}`}
               onChange={(event) => onViewChange(event.target.value)}
@@ -230,7 +209,7 @@ function SplitPanel({ side, view, onViewChange, telemetry, route, playing, chase
           </span>
         </div>
       </div>
-      {!playing && <div className="absolute inset-0 bg-void/10" />}
+      {!playing && <div className="pointer-events-none absolute inset-0 bg-void/10" />}
     </div>
   )
 }
@@ -329,7 +308,6 @@ export default function LaunchViewer({
         <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <StatusDot playing={playing} arrived={arrived} />
               <span className="label text-[9px]">{cameraLabel(view)}</span>
               <span className="rounded-full border border-line/70 bg-void/60 px-2 py-0.5 text-[9px] tracking-[0.1em] text-muted uppercase backdrop-blur">
                 {statusText}
@@ -358,23 +336,37 @@ export default function LaunchViewer({
         </div>
 
         <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-wrap items-end justify-between gap-2">
-          <div className="flex flex-wrap gap-1.5">
-            <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-ink backdrop-blur">
+          <div
+            className="group pointer-events-auto relative w-max"
+            tabIndex={0}
+            role="group"
+            aria-label="Flight telemetry"
+            title="Hover or focus for flight telemetry"
+          >
+            {/* Always visible: gives the group a real hover/focus area and keeps
+                the key readout on screen without hovering. */}
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-ink backdrop-blur">
               {formatPercentC(telemetry.percentC)} c
+              <span className="text-[9px] tracking-[0.12em] text-muted uppercase">telemetry</span>
             </span>
-            <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
-              {formatNumber(telemetry.velocityMs, 0)} m/s
-            </span>
-            <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
-              {telemetry.gForce.toFixed(2)} g
-            </span>
-            <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
-              {formatAltitude(telemetry.altitudeM)}
-              {telemetry.altitudeM < ATMOSPHERE_M ? ' · in atmosphere' : ' · above the atmosphere'}
-            </span>
-            <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
-              thrust {formatThrust(telemetry.thrustN)}
-            </span>
+
+            {/* Absolute so revealing it never pushes the mission bar, and no
+                pointer-events-none so moving into it keeps the hover alive. */}
+            <div className="invisible absolute bottom-full left-0 mb-1.5 flex w-max max-w-[min(24rem,calc(100vw-4rem))] flex-wrap gap-1.5 opacity-0 transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+              <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
+                {formatNumber(telemetry.velocityMs, 0)} m/s
+              </span>
+              <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
+                {telemetry.gForce.toFixed(2)} g
+              </span>
+              <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
+                {formatAltitude(telemetry.altitudeM)}
+                {telemetry.altitudeM < ATMOSPHERE_M ? ' · in atmosphere' : ' · above the atmosphere'}
+              </span>
+              <span className="rounded-full border border-line/70 bg-void/75 px-2.5 py-1 text-[10px] text-muted backdrop-blur">
+                thrust {formatThrust(telemetry.thrustN)}
+              </span>
+            </div>
           </div>
           <div className="min-w-[120px] flex-1 sm:max-w-[220px]">
             <div className="flex items-center justify-between text-[9px] tracking-[0.14em] text-muted uppercase">

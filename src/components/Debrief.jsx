@@ -8,6 +8,7 @@ import {
   surfaceGravity,
 } from '../lib/physics'
 import { classifyPlanet } from '../lib/planet'
+import { useAppStore } from '../store/appStore'
 import CrewLineup from './CrewLineup'
 
 function Stat({ label, value, sub, tone = 'text-ink' }) {
@@ -89,11 +90,11 @@ function PhysicsCard({ mission, planet }) {
           <span className="text-muted">γ = 1/√(1−β²)</span> = {mission.gamma.toFixed(4)}
         </div>
         <div>
-          <span className="text-muted">t⊕ = d/(βc)</span> = {formatNumber(mission.distanceLy, 2)} ly ÷{' '}
+          <span className="text-muted">t<sub>⊕</sub> = d/(βc)</span> = {formatNumber(mission.distanceLy, 2)} ly ÷{' '}
           {mission.beta.toFixed(3)} = {formatNumber(mission.earthYears, 3)} yr
         </div>
         <div>
-          <span className="text-muted">t_ship = t⊕/γ</span> ={' '}
+          <span className="text-muted">t<sub>ship</sub> = t<sub>⊕</sub>/γ</span> ={' '}
           <span className="text-ink">{formatNumber(mission.shipYears, 3)} yr</span>
         </div>
         <div>
@@ -214,8 +215,17 @@ function MissionLog({ sim, planet, onNext, onReset, onGoHome }) {
   )
 }
 
-export default function Debrief({ mission, planet, origin, prediction, sim, onNext, onReset, onGoHome }) {
+export default function Debrief() {
+  const mission = useAppStore((state) => state.mission)
+  const planet = useAppStore((state) => state.planet)
+  const prediction = useAppStore((state) => state.prediction)
+  const sim = useAppStore((state) => state.sim)
+  const nextMission = useAppStore((state) => state.nextMission)
+  const reset = useAppStore((state) => state.reset)
+  const goHome = useAppStore((state) => state.goHome)
+
   const look = classifyPlanet(planet)
+  if (!mission) return null
   const ratio = mission.gamma
 
   return (
@@ -264,7 +274,7 @@ export default function Debrief({ mission, planet, origin, prediction, sim, onNe
         </div>
         <div className="min-w-0 space-y-4">
           <PhysicsCard mission={mission} planet={planet} />
-          <MissionLog sim={sim} planet={planet} onNext={onNext} onReset={onReset} onGoHome={onGoHome} />
+          <MissionLog sim={sim} planet={planet} onNext={nextMission} onReset={reset} onGoHome={goHome} />
         </div>
       </div>
     </div>

@@ -13,6 +13,7 @@ import {
 } from '../lib/planet'
 import { describeAge } from '../lib/aging'
 import { formatNumber } from '../lib/physics'
+import { useAppStore } from '../store/appStore'
 import BobbleFigure from './BobbleFigure'
 import SkeletonFigure from './SkeletonFigure'
 
@@ -255,7 +256,12 @@ function Scene({ planet, earthYears, alienYears }) {
   )
 }
 
-function PlanetStage({ planet, earthYears, alienYears, compact = false, onGoHome }) {
+function PlanetStage({ compact = false }) {
+  const planet = useAppStore((state) => state.location)
+  const sim = useAppStore((state) => state.sim)
+  const onGoHome = useAppStore((state) => state.goHome)
+  const earthYears = sim.earthYears
+  const alienYears = sim.earthYears
   const look = classifyPlanet(planet)
   const star = describeStar(planet)
   const starAngle = starAngularDiameterDeg(planet)

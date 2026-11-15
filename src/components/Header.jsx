@@ -1,11 +1,5 @@
 import { formatYears } from '../lib/physics'
-
-const STEPS = [
-  { id: 'destination', label: 'Route' },
-  { id: 'flight', label: 'Flight plan' },
-  { id: 'journey', label: 'Journey' },
-  { id: 'debrief', label: 'Debrief' },
-]
+import { STEPS, isStageReachable, useAppStore } from '../store/appStore'
 
 function Brand() {
   return (
@@ -32,7 +26,16 @@ function Brand() {
   )
 }
 
-export default function Header({ step, sim, location, onGoHome, onAbout, onReset, inLab = false, onOpenLab }) {
+export default function Header() {
+  const step = useAppStore((state) => state.step)
+  const sim = useAppStore((state) => state.sim)
+  const location = useAppStore((state) => state.location)
+  const mission = useAppStore((state) => state.mission)
+  const goToStep = useAppStore((state) => state.goToStep)
+  const toggleLab = useAppStore((state) => state.toggleLab)
+  const openAbout = useAppStore((state) => state.openAbout)
+  const reset = useAppStore((state) => state.reset)
+  const inLab = step === 'lab'
   const away = location && location.kind !== 'earth'
 
   return (
@@ -42,7 +45,6 @@ export default function Header({ step, sim, location, onGoHome, onAbout, onReset
 
         {(location || away) && (
           <div className="hidden min-w-0 items-center gap-2 rounded-lg border border-line/60 bg-panel/25 px-3 py-1.5 sm:flex">
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ion" />
             <div className="min-w-0">
               <div className="text-[9px] tracking-[0.16em] text-ink/45 uppercase">Current location</div>
               <div className="truncate text-[11px] text-ink">{location?.name}</div>
@@ -54,12 +56,15 @@ export default function Header({ step, sim, location, onGoHome, onAbout, onReset
           {STEPS.map((entry, index) => {
             const active = entry.id === step
             const passed = STEPS.findIndex((s) => s.id === step) > index
+            const reachable = isStageReachable(mission, entry.id)
             return (
-              <div
-                onClick={() => { }} // TODO: Set step
+              <button
+                type="button"
                 key={entry.id}
+                onClick={() => goToStep(entry.id)}
+                disabled={!reachable}
                 aria-current={active ? 'step' : undefined}
-                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] tracking-[0.12em] uppercase transition hover:bg-ion/50 hover:cursor-pointer ${active ? 'bg-ion! text-white' : passed ? 'text-ink/70' : 'text-ink/40'
+                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] tracking-[0.12em] uppercase transition enabled:hover:bg-ion/50 enabled:hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${active ? 'bg-ion! text-white' : passed ? 'text-ink/70' : 'text-ink/40'
                   }`}
               >
                 <span
@@ -69,7 +74,7 @@ export default function Header({ step, sim, location, onGoHome, onAbout, onReset
                   {index + 1}
                 </span>
                 {entry.label}
-              </div>
+              </button>
             )
           })}
         </nav>
@@ -91,18 +96,18 @@ export default function Header({ step, sim, location, onGoHome, onAbout, onReset
           <button
             type="button"
             className={`btn px-3 py-1.5 text-xs ${inLab ? 'btn-primary' : ''}`}
-            onClick={onOpenLab}
+            onClick={toggleLab}
             aria-pressed={inLab}
           >
             {inLab ? '← Mission' : 'Relativity Lab'}
           </button>
-          <button type="button" className="btn px-3 py-1.5 text-xs" onClick={onAbout}>
+          <button type="button" className="btn px-3 py-1.5 text-xs" onClick={openAbout}>
             About
           </button>
           <button
             type="button"
             className="btn px-3 py-1.5 text-xs"
-            onClick={onReset}
+            onClick={reset}
             disabled={sim.missions.length === 0}
           >
             Reset
