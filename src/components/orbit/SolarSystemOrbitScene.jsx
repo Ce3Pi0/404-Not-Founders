@@ -9,6 +9,7 @@ import { thinSkyStars } from '../../lib/skyStars'
 import { SOLAR_SYSTEM } from '../../lib/starMap'
 import { createZoomOutLatch, wheelPixels } from '../../lib/zoomTransition'
 import { createGlowTexture, createRingTexture } from '../../lib/glowTexture'
+import { createSunSurfaceTexture } from '../../lib/sunSurface'
 import { HAS_WEBGL } from '../../lib/webgl'
 import EarthSphere from '../EarthSphere'
 
@@ -31,11 +32,13 @@ const TAU = Math.PI * 2
 /** Hero clock: in simulated days per real second. */
 const DAYS_PER_SECOND = 3
 
-const SPACE = '#04010c'
+const SPACE = '#05050a'
 /** The Sun's own warm tones — the star is never drawn as a white ball. */
-const SUN_CORE = '#ffcf7a'
 const SUN_MID = '#ffb75e'
-const SUN_GLOW = '#ff9a3c'
+const SUN_GLOW = '#ff8a24'
+/** Orbit paths read as thin, cool, glowing rings against the black. */
+const ORBIT_COLOR = '#3f6f9e'
+const ORBIT_HOME = '#8fd8ff'
 
 const EARTH_BODY = SOLAR?.bodies.find((body) => body.planet.id === 'earth') ?? null
 const EARTH_START = EARTH_BODY
@@ -52,7 +55,7 @@ const EARTH_START = EARTH_BODY
  * the journey starts from.
  */
 const VIEW_AZIMUTH = (EARTH_BODY?.phase ?? 0) + THREE.MathUtils.degToRad(18)
-const HOME_DISTANCE = EXTENT * 1.95
+const HOME_DISTANCE = EXTENT * 2.15
 const HOME_CAMERA = new THREE.Vector3(
   Math.cos(VIEW_AZIMUTH) * HOME_DISTANCE * 0.85,
   HOME_DISTANCE * 0.53,
@@ -62,7 +65,8 @@ const HOME_TARGET = EARTH_START.clone().multiplyScalar(0.45)
 
 /** Furthest the opening camera may pull back before the handoff gesture. */
 const MAX_DISTANCE = EXTENT * 2.9
-const MIN_DISTANCE = EXTENT * 0.25
+/** Close enough to inspect a planet's surface without entering the Sun. */
+const MIN_DISTANCE = EXTENT * 0.08
 /** Within this share of the limit the scene is "at the limit" for the handoff. */
 const LIMIT_BAND = 0.9
 
@@ -80,25 +84,38 @@ function createMilkyWayTexture() {
   context.fillRect(0, 0, width, height)
 
   const random = mulberry32(1977)
-  for (let i = 0; i < 26; i += 1) {
+  // Violet-to-magenta dust with warm gold star clouds, the palette of the
+  // reference: deep indigo hazing into pinks, picked out by gold.
+  const tones = [
+    [104, 62, 176],
+    [128, 44, 158],
+    [72, 40, 132],
+    [186, 104, 172],
+    [196, 138, 82],
+    [214, 166, 104],
+  ]
+  for (let i = 0; i < 34; i += 1) {
     const x = random() * width
     const centre = 256 + Math.sin((x / width) * Math.PI * 2) * 74
-    const y = centre + (random() - 0.5) * 110
-    const radius = 90 + random() * 130
+    const y = centre + (random() - 0.5) * 118
+    const radius = 80 + random() * 150
+    const [r, g, b] = tones[Math.floor(random() * tones.length)]
     const glow = context.createRadialGradient(x, y, 0, x, y, radius)
-    glow.addColorStop(0, `rgba(150,166,214,${0.026 + random() * 0.03})`)
-    glow.addColorStop(1, 'rgba(120,132,190,0)')
+    glow.addColorStop(0, `rgba(${r},${g},${b},${0.1 + random() * 0.14})`)
+    glow.addColorStop(0.5, `rgba(${r},${g},${b},${0.04 + random() * 0.05})`)
+    glow.addColorStop(1, `rgba(${r},${g},${b},0)`)
     context.fillStyle = glow
     context.fillRect(x - radius, y - radius, radius * 2, radius * 2)
   }
-  for (let i = 0; i < 7000; i += 1) {
+  for (let i = 0; i < 9000; i += 1) {
     const x = random() * width
     const centre = 256 + Math.sin((x / width) * Math.PI * 2) * 74
     const spread = 46 + Math.sin((x / width) * Math.PI * 3) * 20
     const offset = (random() + random() + random() - 1.5) * spread
     const y = centre + offset
-    const alpha = 0.04 + random() * 0.22
-    context.fillStyle = `rgba(214,224,255,${alpha})`
+    const alpha = 0.05 + random() * 0.26
+    const warm = random() < 0.22
+    context.fillStyle = warm ? `rgba(255,214,170,${alpha})` : `rgba(214,196,255,${alpha})`
     context.fillRect(x, y, random() < 0.88 ? 1 : 1.6, 1)
   }
 
@@ -115,11 +132,11 @@ function MilkyWay() {
   useEffect(() => () => texture.dispose(), [texture])
 
   return (
-    <mesh rotation={[0.62, 1.15, 0.22]} scale={EXTENT * 90}>
+    <mesh rotation={[0.5, 1.42, 0.3]} scale={EXTENT * 90}>
       <sphereGeometry args={[1, 48, 48]} />
       <meshBasicMaterial
         map={texture}
-        color="#c8d3ff"
+        color="#d9c8ff"
         side={THREE.BackSide}
         transparent
         opacity={0.85}
@@ -228,23 +245,30 @@ function StarField({ glow }) {
 /* ------------------------------------------------------------ the system -- */
 
 /**
- * The Sun: a warm golden disc with progressively wider, softer glows, drawn
- * from the same glow sprite the rest of the map uses. Its light is the scene's
- * only key light, so the planets' phases are the real ones.
+ * The Sun: a textured photosphere — granulation, dark plasma patches and
+ * sunspots, see lib/sunSurface.js — wrapped in progressively wider, softer
+ * glows drawn from the same sprite the rest of the map uses. Its light is the
+ * scene's only key light, so the planets' phases are the real ones.
  */
 function Sun({ glow }) {
   const radius = SOLAR.star.units
+  const surface = useMemo(createSunSurfaceTexture, [])
+  const core = useRef(null)
+  useEffect(() => () => surface.dispose(), [surface])
+  useFrame((_, delta) => {
+    if (core.current) core.current.rotation.y += delta * 0.035
+  })
   const layers = [
-    { scale: 2.1, color: '#fff3d2', opacity: 0.9 },
-    { scale: 4.4, color: SUN_MID, opacity: 0.5 },
-    { scale: 9, color: SUN_GLOW, opacity: 0.26 },
+    { scale: 1.45, color: '#fff2cf', opacity: 0.85 },
+    { scale: 2.7, color: SUN_MID, opacity: 0.5 },
+    { scale: 5, color: SUN_GLOW, opacity: 0.22 },
   ]
 
   return (
     <group>
-      <mesh>
-        <sphereGeometry args={[radius, 48, 48]} />
-        <meshBasicMaterial color={SUN_CORE} toneMapped={false} />
+      <mesh ref={core}>
+        <sphereGeometry args={[radius, 64, 64]} />
+        <meshBasicMaterial map={surface} toneMapped={false} />
       </mesh>
       {layers.map((layer) => (
         <sprite key={layer.scale} scale={[radius * layer.scale, radius * layer.scale, 1]}>
@@ -281,22 +305,79 @@ function OrbitRing({ radius, highlight }) {
   return (
     <lineLoop geometry={geometry}>
       <lineBasicMaterial
-        color={highlight ? '#8fd8ff' : '#93a8cc'}
+        color={highlight ? ORBIT_HOME : ORBIT_COLOR}
         transparent
-        opacity={highlight ? 0.42 : 0.15}
+        opacity={highlight ? 0.5 : 0.3}
         depthWrite={false}
       />
     </lineLoop>
   )
 }
 
+/** Banded tan terrain for Saturn's ring disc — planar UVs, so circles read as rings. */
+function createSaturnRingTexture() {
+  const size = 512
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const context = canvas.getContext('2d')
+  const centre = size / 2
+  const random = mulberry32(9031)
+
+  let radius = size * 0.295
+  while (radius < size * 0.5) {
+    const width = 0.8 + random() * 6
+    const tone = 138 + Math.floor(random() * 84)
+    context.strokeStyle = `rgba(${tone + 26},${tone},${Math.floor(tone * 0.78)},${
+      0.12 + random() * 0.5
+    })`
+    context.lineWidth = width
+    context.beginPath()
+    context.arc(centre, centre, radius, 0, TAU)
+    context.stroke()
+    radius += width * (0.45 + random() * 0.95)
+  }
+
+  // Cassini division: a clean gap through the bands.
+  context.globalCompositeOperation = 'destination-out'
+  context.lineWidth = 6
+  context.beginPath()
+  context.arc(centre, centre, size * 0.4, 0, TAU)
+  context.stroke()
+  context.globalCompositeOperation = 'source-over'
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.needsUpdate = true
+  return texture
+}
+
+function SaturnRings({ radius }) {
+  const rings = useMemo(createSaturnRingTexture, [])
+  useEffect(() => () => rings.dispose(), [rings])
+
+  return (
+    <mesh rotation={[-Math.PI / 2 + 0.47, 0, 0.22]} scale={radius}>
+      <ringGeometry args={[1.32, 2.25, 160]} />
+      <meshBasicMaterial
+        map={rings}
+        transparent
+        opacity={0.95}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+        toneMapped={false}
+      />
+    </mesh>
+  )
+}
+
 /**
  * One planet riding its orbit. Earth wears the shared Blue Marble surface and
- * carries the projected "you are here" label; every other world keeps its
- * procedural surface.
+ * a small home marker; every other world keeps its procedural surface.
  */
 function PlanetBody({ body, ring }) {
   const isEarth = body.planet.kind === 'earth'
+  const isSaturn = body.planet.id === 'saturn'
   const surface = useMemo(
     () => (isEarth ? null : createPlanetTexture(body.planet)),
     [body.planet, isEarth],
@@ -334,18 +415,21 @@ function PlanetBody({ body, ring }) {
           </mesh>
         )}
       </group>
+      {/* Home marker: a hairline ring just outside the disc, depth-tested so it
+          can never paint over Earth. Small on purpose — the planet stays
+          readable when you zoom in. */}
       {isEarth && (
-        <sprite scale={[radius * 3.6, radius * 3.6, 1]}>
+        <sprite scale={[radius * 2.75, radius * 2.75, 1]}>
           <spriteMaterial
             map={ring}
             color="#8fd8ff"
             transparent
-            opacity={0.7}
+            opacity={0.45}
             depthWrite={false}
-            depthTest={false}
           />
         </sprite>
       )}
+      {isSaturn && <SaturnRings radius={radius} />}
     </group>
   )
 }
@@ -475,7 +559,7 @@ function ResponsiveFraming() {
 
 function Scene({ onZoomOut, onLimitChange }) {
   const glow = useMemo(createGlowTexture, [])
-  const ring = useMemo(() => createRingTexture(2.5), [])
+  const ring = useMemo(() => createRingTexture(5), [])
   useEffect(
     () => () => {
       glow.dispose()
@@ -521,6 +605,7 @@ const OrbitCanvas = memo(function OrbitCanvas({ onZoomOut }) {
           powerPreference: 'high-performance',
           logarithmicDepthBuffer: true,
         }}
+
       >
         <Scene onZoomOut={onZoomOut} onLimitChange={setAtLimit} />
       </Canvas>
