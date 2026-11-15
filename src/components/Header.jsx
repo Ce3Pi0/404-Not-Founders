@@ -7,9 +7,9 @@ const STEPS = [
   { id: 'debrief', label: 'Debrief' },
 ]
 
-function Brand() {
+function Brand({ goHome }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 cursor-pointer" onClick={goHome}>
       <svg viewBox="0 0 48 48" className="h-9 w-9 shrink-0" aria-hidden="true">
         <circle cx="24" cy="24" r="8" fill="#9a0680" />
         <ellipse
@@ -35,7 +35,6 @@ function Brand() {
 export default function Header({
   step,
   sim,
-  onGoHome,
   onAbout,
   onReset,
   onSelectStep,
@@ -43,10 +42,13 @@ export default function Header({
   inMap = false,
   onOpenMap,
 }) {
+
+  const onGoHome = () => window.location.href = "/";
+
   return (
     <header className="sticky top-0 z-40 border-b border-line/60 bg-void/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 lg:px-8">
-        <Brand />
+        <Brand goHome={onGoHome} />
 
         <nav aria-label="Mission stages" className="hidden items-center gap-2 md:flex">
           {STEPS.map((entry, index) => {
