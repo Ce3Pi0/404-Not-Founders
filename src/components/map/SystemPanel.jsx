@@ -36,7 +36,7 @@ export default function SystemPanel({
   return (
     <div
       data-testid="system-panel"
-      className="panel pointer-events-auto flex max-h-full flex-col gap-3 overflow-auto p-4"
+      className="panel pointer-events-auto flex min-h-0 flex-col gap-3 overflow-auto p-4"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">

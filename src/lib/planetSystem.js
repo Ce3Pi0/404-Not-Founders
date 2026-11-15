@@ -15,6 +15,9 @@
 //    label that shows them says so.
 //  · Orbits are circular, with a deterministic *illustrative* starting phase —
 //    not a present-day ephemeris (the extract has no epoch or mean anomaly).
+//  · Orbit *rates* keep their true ratios from `pl_orbper`, but the clock is
+//    normalised per system (see `daysPerSecond`), otherwise a 2,500-day world
+//    would look frozen next to a 1.5-day one.
 //  · Rows without `pl_orbsmax` are never given an invented radius: they are
 //    returned in `uncharted` and the UI shows "Orbit not fully characterized".
 
@@ -26,15 +29,32 @@ const TAU = Math.PI * 2
 /** 1 local scene unit = 1 AU — separate from the light-year universe map. */
 export const AU_PER_UNIT = 1
 
-export const SPEED_MIN_DAYS_PER_SECOND = 0.05
-export const SPEED_MAX_DAYS_PER_SECOND = 200
-
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
-/** Log slider position (0..1) → simulated days per real second. */
-export function daysPerSecond(position) {
+// The orbit clock is normalised per system. One fixed days-per-second rate
+// cannot serve both a 1.5-day world and a 60,000-day one: at any single rate one
+// end of the system either crawls or smears into a blur. The slider instead sets
+// how long the system's reference world takes per orbit, and every body keeps
+// its true rate ratio from `pl_orbper`.
+const ORBIT_SECONDS_SLOW = 240
+const ORBIT_SECONDS_FAST = 8
+
+/** Geometric mean of the drawn orbital periods — the system's own clock. */
+export function systemReferencePeriodDays(system) {
+  const periods = (system?.bodies ?? [])
+    .map((body) => body.periodDays)
+    .filter((days) => days != null && days > 0)
+  if (!periods.length) return 365
+  const logMean = periods.reduce((sum, days) => sum + Math.log(days), 0) / periods.length
+  return Math.exp(logMean)
+}
+
+/** Log slider position (0..1) → simulated days per real second, per system. */
+export function daysPerSecond(position, referencePeriodDays = 365) {
   const t = clamp(position, 0, 1)
-  return SPEED_MIN_DAYS_PER_SECOND * (SPEED_MAX_DAYS_PER_SECOND / SPEED_MIN_DAYS_PER_SECOND) ** t
+  const seconds =
+    ORBIT_SECONDS_SLOW * (ORBIT_SECONDS_FAST / ORBIT_SECONDS_SLOW) ** t
+  return Math.max(1e-9, referencePeriodDays) / seconds
 }
 
 export function formatSimSpeed(days) {
