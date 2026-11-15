@@ -6,7 +6,7 @@ import * as THREE from 'three'
  * Procedural spacecraft. The nose points down −Z, the engine plume trails
  * toward +Z, matching the direction of travel used by every flight scene.
  */
-export default function Spacecraft({ glow = '#5ee7ff', engine = 1, scale = 1, detail = true }) {
+export default function Spacecraft({ glow = '#5ee7ff', engine = 1, scale = 1, detail = true, light = 5 }) {
   const plume = useRef()
   const beacon = useRef()
 
@@ -83,7 +83,7 @@ export default function Spacecraft({ glow = '#5ee7ff', engine = 1, scale = 1, de
         />
       </mesh>
 
-      <pointLight position={[0, 0, 1.9]} color={glow} intensity={5} distance={14} decay={2} />
+      <pointLight position={[0, 0, 1.9]} color={glow} intensity={light} distance={14} decay={2} />
     </group>
   )
 }

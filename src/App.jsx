@@ -9,6 +9,7 @@ import AboutDialog from './components/AboutDialog'
 import StarMapView from './components/map/StarMapView'
 import SystemView from './components/map/SystemView'
 import PlanetDetailView from './components/PlanetDetailView'
+import EarthOrbitHero from './components/orbit/EarthOrbitHero'
 import ChallengeShell from './components/challenge/ChallengeShell'
 import {
   CHALLENGE_PATHS,
@@ -39,6 +40,13 @@ export default function App() {
   const [mission, setMission] = useState(null)
   const [sim, setSim] = useState(loadSimulation)
   const [aboutOpen, setAboutOpen] = useState(false)
+  // Set when the map is entered from Earth orbit, so it opens on the Solar
+  // System and pulls the camera back out instead of jumping straight to home.
+  const [mapArrival, setMapArrival] = useState(null)
+  // Full-screen cover used for the Earth <-> star map handoff.
+  const [warp, setWarp] = useState(null)
+  const warpTimer = useRef(null)
+  const transitioning = useRef(false)
   // A journey records its mission exactly once, when the ship actually arrives.
   const recordedMission = useRef(null)
   // Selected star + camera framing survive a trip to /system/:id and back.
@@ -67,6 +75,8 @@ export default function App() {
   useEffect(() => {
     saveSimulation(sim)
   }, [sim])
+
+  useEffect(() => () => clearTimeout(warpTimer.current), [])
 
   /** A planet deep link selects that world, so its page and travel share it. */
   useEffect(() => {
@@ -179,6 +189,41 @@ export default function App() {
     goTo('destination')
   }
 
+  /**
+   * The Earth orbit scene and the star map are separate renders at separate
+   * scales. This is the handoff: a cover fades in over the running scene, the
+   * next screen mounts underneath it, and the cover lifts on the other side.
+   */
+  const beginTransition = (label, run) => {
+    if (transitioning.current) return
+    transitioning.current = true
+    setWarp(label)
+    clearTimeout(warpTimer.current)
+    warpTimer.current = setTimeout(() => {
+      run()
+      setWarp(null)
+      transitioning.current = false
+    }, 640)
+  }
+
+  /** Earth orbit → the real star map, opening from the Solar System outward. */
+  const exploreUniverse = () =>
+    beginTransition(
+      location.kind === 'earth' ? 'Leaving Earth orbit' : `Leaving ${location.name}`,
+      () => {
+        // Only an Earth departure starts the map on the Solar System.
+        setMapArrival(location.kind === 'earth' ? Date.now() : null)
+        goTo('map')
+      },
+    )
+
+  /** Zooming into the Solar System → back into the Earth orbital scene. */
+  const returnToEarthOrbit = () =>
+    beginTransition('Entering Earth orbit', () => {
+      setMapArrival(null)
+      goTo('destination')
+    })
+
   // The 3D map edits the same origin/destination state as the picker.
   const mapSetDestination = (next) => {
     if (!next || next.id === location.id) return
@@ -207,6 +252,8 @@ export default function App() {
 
   const exploreSystem = (entry) => {
     if (!entry) return
+    // Coming back from a system page restores its framing, not the solar entry.
+    setMapArrival(null)
     setStepState('map')
     navigate(`/system/${systemId(entry)}`)
   }
@@ -289,7 +336,37 @@ export default function App() {
       />
 
       <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-4 lg:px-8 lg:py-6">
-        {step === 'destination' && (
+        {step === 'destination' && location.kind === 'earth' && (
+          <div className="space-y-4">
+            <EarthOrbitHero
+              onExploreUniverse={exploreUniverse}
+              onStartChallenge={() => navigate(CHALLENGE_PATHS.intro)}
+              onPlanRoute={() =>
+                document.getElementById('route-planner')?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'start',
+                })
+              }
+            />
+            <section id="route-planner" className="screen mx-auto w-full max-w-3xl scroll-mt-24">
+              <DestinationPicker
+                origin={location}
+                planet={planet}
+                distanceLy={distanceLy}
+                onOriginChange={setLocation}
+                onSelect={setPlanet}
+                onContinue={() => goTo('flight')}
+                onGoHome={goHome}
+                onOpenMap={exploreUniverse}
+                onStartChallenge={() => navigate(CHALLENGE_PATHS.intro)}
+              />
+            </section>
+          </div>
+        )}
+
+        {/* Away from Earth the orbit scene becomes a portrait of where the crew
+            actually is, with the same route planner beside it. */}
+        {step === 'destination' && location.kind !== 'earth' && (
           <div className="screen grid items-start gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
             <div className="min-w-0 lg:sticky lg:top-[84px] lg:self-start">
               <PlanetStage
@@ -307,10 +384,7 @@ export default function App() {
               onSelect={setPlanet}
               onContinue={() => goTo('flight')}
               onGoHome={goHome}
-              onOpenMap={() => {
-                navigate('/')
-                setStepState('map')
-              }}
+              onOpenMap={exploreUniverse}
               onStartChallenge={() => navigate(CHALLENGE_PATHS.intro)}
             />
           </div>
@@ -331,10 +405,12 @@ export default function App() {
               origin={location}
               planet={planet}
               viewState={mapViewState}
+              arrival={mapArrival}
               onSetDestination={mapSetDestination}
               onSetOrigin={mapSetOrigin}
               onExplore={exploreSystem}
               onExit={() => goTo('destination')}
+              onReturnToEarth={returnToEarthOrbit}
               onStartChallenge={() => navigate(CHALLENGE_PATHS.intro)}
             />
           ))}
@@ -402,6 +478,22 @@ export default function App() {
           <span>Planetary data: NASA Exoplanet Archive CSV extract (6,442 planets)</span>
         </div>
       </footer>
+
+      {warp && (
+        <div
+          className="warp-fade fixed inset-0 z-[60] flex items-center justify-center bg-[#04010c]"
+          data-testid="earth-orbit-transition"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="text-center">
+            <div className="text-[9px] font-semibold tracking-[0.3em] text-white/40 uppercase">
+              Sol system
+            </div>
+            <div className="mt-2 text-[12px] tracking-[0.28em] text-white/85 uppercase">{warp}</div>
+          </div>
+        </div>
+      )}
 
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>

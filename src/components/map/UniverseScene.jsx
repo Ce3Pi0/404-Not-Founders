@@ -7,8 +7,7 @@ import { SOLAR_SYSTEM } from '../../lib/starMap'
 import { HAS_WEBGL } from '../../lib/webgl'
 import { createGlowTexture, createHaloTexture } from '../../lib/glowTexture'
 
-const HOME_CAMERA = [18, 12, 26]
-const HOME_TARGET = [0, 0, 0]
+import { HOME_CAMERA, HOME_TARGET, EARTH_RETURN_DISTANCE } from '../../lib/mapCamera'
 /** Cyan is the map's signature accent for the inspected system. */
 const CYAN = '#5ee7ff'
 
@@ -489,6 +488,7 @@ function SceneRig({
   focus,
   onSelect,
   onHover,
+  onApproachOrigin = null,
   routeGlow = false,
   routePath = null,
   ship = null,
@@ -500,6 +500,7 @@ function SceneRig({
   const { camera, gl, size } = useThree()
   const controls = useMemo(() => new OrbitControls(camera, gl.domElement), [camera, gl])
   const projection = useMemo(() => new THREE.Vector3(), [])
+  const approachArmed = useRef(false)
   const hoverAt = useRef(0)
   const tween = useRef(null)
   const firstReset = useRef(true)
@@ -512,7 +513,8 @@ function SceneRig({
     controls.rotateSpeed = 0.65
     controls.zoomSpeed = 0.9
     controls.panSpeed = 0.8
-    controls.minDistance = 2
+    // Close enough to dive into the Solar origin and return to Earth orbit.
+    controls.minDistance = 1.2
     controls.maxDistance = maxDistance
     return () => controls.dispose()
   }, [controls])
@@ -699,6 +701,24 @@ function SceneRig({
     }
     controls.update()
 
+    /**
+     * Diving into the Solar origin is the reverse of leaving Earth: once the
+     * camera is back inside the Solar System, hand the view back to the orbit
+     * scene. Arming at a real distance keeps the arrival flight from firing it.
+     */
+    if (onApproachOrigin) {
+      const distance = camera.position.length()
+      if (distance > 8) approachArmed.current = true
+      if (
+        approachArmed.current &&
+        distance < EARTH_RETURN_DISTANCE &&
+        controls.target.length() < 1.4
+      ) {
+        approachArmed.current = false
+        onApproachOrigin()
+      }
+    }
+
     if (cameraState) {
       cameraState.position = camera.position.toArray()
       cameraState.target = controls.target.toArray()
@@ -814,6 +834,7 @@ export default function UniverseScene({
   focus,
   onSelect,
   onHover,
+  onApproachOrigin,
   routeGlow,
   routePath,
   ship,
@@ -860,6 +881,7 @@ export default function UniverseScene({
         focus={focus}
         onSelect={onSelect}
         onHover={onHover}
+        onApproachOrigin={onApproachOrigin}
         routeGlow={routeGlow}
         routePath={routePath}
         ship={ship}
