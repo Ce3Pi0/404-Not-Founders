@@ -6,7 +6,8 @@ import FlightPlan from './components/FlightPlan'
 import JourneyStage from './components/JourneyStage'
 import Debrief from './components/Debrief'
 import AboutDialog from './components/AboutDialog'
-import { DEFAULT_PLANET, EARTH, distanceLyBetween, nearbyPlanets } from './lib/catalog'
+import RelativityLab from './components/lab/RelativityLab'
+import { DEFAULT_PLANET } from './lib/catalog'
 import { simulateMission } from './lib/physics'
 import { emptySimulation, loadSimulation, recordMission, saveSimulation } from './lib/simulation'
 
@@ -96,6 +97,8 @@ export default function App() {
         onGoHome={goHome}
         onAbout={() => setAboutOpen(true)}
         onReset={reset}
+        inLab={step === 'lab'}
+        onOpenLab={() => setStep(step === 'lab' ? 'destination' : 'lab')}
       />
 
       <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-4 lg:px-8 lg:py-6">
@@ -146,6 +149,10 @@ export default function App() {
             shipName={mission.shipName}
             onArrive={arrive}
           />
+        )}
+
+        {step === 'lab' && (
+          <RelativityLab shipName={shipName} onExit={() => setStep('destination')} />
         )}
 
         {step === 'debrief' && mission && (
