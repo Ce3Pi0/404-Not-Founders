@@ -1,4 +1,4 @@
-import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -6,8 +6,8 @@ import earthDayMap from '../../assets/earth/earth_atmos_2048.jpg'
 import earthNormalMap from '../../assets/earth/earth_normal_2048.jpg'
 import earthSpecularMap from '../../assets/earth/earth_specular_2048.jpg'
 import earthCloudMap from '../../assets/earth/earth_clouds_1024.png'
-import { MAPPED_SYSTEMS, SOLAR_WORLDS } from '../../lib/catalog'
-import { classifyPlanet, mulberry32, starColor } from '../../lib/planet'
+import { MAPPED_SYSTEMS } from '../../lib/catalog'
+import { mulberry32, starColor } from '../../lib/planet'
 import { createZoomOutLatch, wheelPixels } from '../../lib/zoomTransition'
 import { createGlowTexture } from '../../lib/glowTexture'
 import { HAS_WEBGL } from '../../lib/webgl'
@@ -27,11 +27,11 @@ const SUN_COLOR = '#fff3e2'
 const SPACE = '#04010c'
 
 /**
- * The orbit scene is Earth drawn from just above the atmosphere, with the Sun
- * and the rest of the Solar System at their real orbital distances around it.
+ * The orbit scene is Earth drawn from just above the atmosphere with the Sun
+ * beyond it — nothing else. The other Solar System worlds belong to the star
+ * map, the Solar System view and the travel planner, not to this close-up.
  * The Sun's sky angle is measured from the opening camera, so it opens just past
- * Earth's limb in the direction the key light actually comes from; every other
- * world is placed on the ecliptic at its own semi-major axis from the extract.
+ * Earth's limb in the direction the key light actually comes from.
  */
 const HOME_CAMERA = new THREE.Vector3(2.3, 1.5, 5.9)
 const VIEW_AXIS = HOME_CAMERA.clone().negate().normalize()
@@ -53,68 +53,24 @@ const SUN_VERTICAL_DEG = 12
 const SUN_DIRECTION = skyDirection(SUN_HORIZONTAL_DEG, SUN_VERTICAL_DEG)
 
 /**
- * Solar System scale.
+ * Earth-view Sun scale.
  *
- * Orbital distances use one linear factor for every planet — the spacing
- * between orbits is exactly the extract's spacing:
- *
- *     1 AU = 32 scene units          (1 unit = 1 Earth radius)
- *
- * Earth's real orbital radius is 23,481 Earth radii, so this is a uniform ~730×
- * compression of the orbit radii. Nothing else about the layout is stylised:
- * Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus and Neptune sit at
- * 0.39 / 0.72 / 1 / 1.52 / 5.20 / 9.54 / 19.19 / 30.07 AU from the Sun.
- *
- * Body radii are the measured radii in Earth radii (so Jupiter really is ~11×
- * Earth), which at this distance is far below one pixel for the outer worlds —
- * hence the constant-screen-size glow, name labels and screen-space pick
- * targets. Those change how a planet is *found*, never where it is.
+ * The scene is drawn in Earth radii (1 unit = 6,371 km) so Earth's surface keeps
+ * its float precision. At that scale the Sun's real geometry is unusable from
+ * this close-up: 23,481 Earth radii away (far outside the camera's far plane)
+ * with a 109 Earth-radius disc. So the Earth view keeps the Sun's *real angular
+ * size* rather than its real proportions — it sits at a fixed, far sky distance
+ * and its radius is derived from the 0.53° disc the Sun actually subtends from
+ * Earth. Parallax across the whole orbit camera range (2.35–10 units) is under
+ * half a percent, so it reads as a distant star and never as a nearby prop.
+ * Sunlight still arrives along the same direction, so Earth's shading is
+ * unchanged. The Solar System view keeps its own scale, untouched.
  */
-const UNITS_PER_AU = 32
-const SUN_DISTANCE = UNITS_PER_AU
-const SUN_RADIUS = 3
-const SUN_POSITION = SUN_DIRECTION.clone().multiplyScalar(SUN_DISTANCE)
-
-/**
- * The ecliptic as a plane through the Sun and Earth: Earth is the scene origin,
- * so its direction from the Sun is -SUN_DIRECTION and is the plane's reference
- * axis. Planets take a deterministic starting phase (the extract carries no
- * epoch), which is illustrative — their orbital radii are not.
- */
-const ORBIT_NORMAL = new THREE.Vector3()
-  .crossVectors(SUN_DIRECTION, new THREE.Vector3(0, 1, 0))
-  .normalize()
-const ORBIT_RIGHT = SUN_DIRECTION.clone().negate().normalize()
-const ORBIT_FORWARD = new THREE.Vector3().crossVectors(ORBIT_NORMAL, ORBIT_RIGHT).normalize()
-
-function orbitPosition(au, angle) {
-  const radius = au * UNITS_PER_AU
-  return SUN_POSITION.clone()
-    .addScaledVector(ORBIT_RIGHT, Math.cos(angle) * radius)
-    .addScaledVector(ORBIT_FORWARD, Math.sin(angle) * radius)
-}
-
-/** Every Solar System world except Earth, at its own orbital distance. */
-const ORBIT_SOURCES = SOLAR_WORLDS.filter((planet) => planet.id !== 'earth')
-
-const ORBIT_BODIES = ORBIT_SOURCES.map((planet, index) => {
-  /**
-   * Starting phase along the orbit. The extract carries no epoch or mean
-   * anomaly, so no present-day arrangement is claimed — but the phases are
-   * spread evenly and rotated a third of a turn, which puts the inner system in
-   * the opening frame instead of leaving it to chance. Orbital radii, and so
-   * every distance between the planets, still come from the data.
-   */
-  const phase = THREE.MathUtils.degToRad(30) + (index / ORBIT_SOURCES.length) * Math.PI * 2
-  return {
-    planet,
-    position: orbitPosition(planet.semiMajorAxisAu ?? 1, phase),
-    // Measured radius in Earth radii, with a floor so the smallest still draws.
-    radiusUnits: Math.max((planet.radiusEarth ?? 1) * 0.9, 0.14),
-    color: classifyPlanet(planet).palette[2],
-    ring: planet.id === 'saturn',
-  }
-})
+const SUN_ANGULAR_DIAMETER_DEG = 0.53
+const SUN_VIEW_DISTANCE = 1500
+const SUN_VIEW_RADIUS =
+  SUN_VIEW_DISTANCE * Math.tan(THREE.MathUtils.degToRad(SUN_ANGULAR_DIAMETER_DEG / 2))
+const SUN_POSITION = SUN_DIRECTION.clone().multiplyScalar(SUN_VIEW_DISTANCE)
 
 /* --------------------------------------------------------------- textures -- */
 
@@ -166,7 +122,7 @@ function MilkyWay() {
   const texture = useMemo(createMilkyWayTexture, [])
   useEffect(() => () => texture.dispose(), [texture])
 
-  // The backdrop sits beyond Neptune's drawn orbit (~960 units out).
+  // The backdrop sits beyond the Sun's 1,500-unit sky distance.
   return (
     <mesh rotation={[0.62, 1.15, 0.22]} scale={2600}>
       <sphereGeometry args={[1, 48, 48]} />
@@ -418,220 +374,43 @@ function Earth() {
   )
 }
 
-/** Small canvas name tag, drawn as a billboard so it always faces the camera. */
-function createLabelTexture(text) {
-  const width = 512
-  const height = 128
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const context = canvas.getContext('2d')
-  context.clearRect(0, 0, width, height)
-  context.font = '600 46px ui-sans-serif, system-ui, -apple-system, sans-serif'
-  context.textAlign = 'center'
-  context.textBaseline = 'middle'
-  context.fillStyle = 'rgba(4, 1, 12, 0.62)'
-  const metrics = context.measureText(text.toUpperCase())
-  const padding = 26
-  const boxX = width / 2 - metrics.width / 2 - padding
-  if (typeof context.roundRect === 'function') {
-    context.beginPath()
-    context.roundRect(boxX, height / 2 - 38, metrics.width + padding * 2, 76, 18)
-    context.fill()
-  } else {
-    context.fillRect(boxX, height / 2 - 38, metrics.width + padding * 2, 76)
-  }
-  context.fillStyle = '#eaf4ff'
-  context.fillText(text.toUpperCase(), width / 2, height / 2)
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.needsUpdate = true
-  return texture
-}
-
 /**
- * One Solar System world at its orbital position. The sphere is drawn at its
- * measured radius in Earth radii; the halo and the name tag scale with camera
- * distance so a dot 900 units away is still findable and clickable.
+ * The Sun, seen from Earth: a small, brilliant disc about half a degree across
+ * sitting 1,500 units beyond the camera's reach, on the direction the key light
+ * actually comes from. It is scenery only — it never takes a pointer event, so
+ * it cannot interfere with orbit drag or the zoom-out handoff.
  */
-function SolarBody({ body, glow, hovered }) {
-  const node = useRef(null)
-  const halo = useRef(null)
-  const tag = useRef(null)
-  const [label] = useState(() => createLabelTexture(body.planet.name))
-
-  useEffect(() => () => label.dispose(), [label])
-
-  useFrame(({ camera }) => {
-    if (!node.current) return
-    const distance = camera.position.distanceTo(node.current.position)
-    const halfHeight = Math.tan((camera.fov * Math.PI) / 360) * distance
-    if (halo.current) {
-      const scale = Math.max(body.radiusUnits * 4, halfHeight * 0.028)
-      halo.current.scale.set(scale, scale, 1)
-      halo.current.material.opacity = hovered ? 0.9 : 0.5
-    }
-    if (tag.current) {
-      const height = halfHeight * 0.055
-      tag.current.position.set(0, Math.max(body.radiusUnits * 2, height * 1.6), 0)
-      tag.current.scale.set(height * 4, height, 1)
-      tag.current.material.opacity = hovered ? 1 : 0.75
-    }
-  })
-
+function Sun({ glow }) {
   return (
-    <group ref={node} position={body.position.toArray()}>
+    <group position={SUN_POSITION.toArray()}>
       <mesh>
-        <sphereGeometry args={[body.radiusUnits, 32, 32]} />
-        <meshStandardMaterial
-          color={body.color}
-          roughness={0.82}
-          metalness={0.04}
-          emissive={body.color}
-          emissiveIntensity={hovered ? 0.55 : 0.16}
-        />
+        <sphereGeometry args={[SUN_VIEW_RADIUS, 32, 32]} />
+        <meshBasicMaterial color="#fff4d8" toneMapped={false} />
       </mesh>
-      {body.ring && (
-        <mesh rotation={[Math.PI / 2 - 0.38, 0.28, 0]} scale={[1, 1, 0.35]}>
-          <ringGeometry args={[body.radiusUnits * 1.4, body.radiusUnits * 2.15, 64]} />
-          <meshBasicMaterial
-            color="#d9c9a0"
-            transparent
-            opacity={0.72}
-            side={THREE.DoubleSide}
-            depthWrite={false}
-          />
-        </mesh>
-      )}
-      <sprite ref={halo}>
+      <sprite scale={[SUN_VIEW_RADIUS * 3.2, SUN_VIEW_RADIUS * 3.2, 1]}>
         <spriteMaterial
           map={glow}
-          color={body.color}
+          color="#ffd9a0"
           transparent
-          opacity={0.5}
+          opacity={0.55}
           depthWrite={false}
           blending={THREE.AdditiveBlending}
         />
       </sprite>
-      <sprite ref={tag}>
-        <spriteMaterial map={label} transparent depthWrite={false} toneMapped={false} />
+      <sprite scale={[SUN_VIEW_RADIUS * 2.2, SUN_VIEW_RADIUS * 2.2, 1]}>
+        <spriteMaterial
+          map={glow}
+          color="#ffffff"
+          transparent
+          opacity={0.85}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
       </sprite>
     </group>
   )
 }
 
-/**
- * The Sun and the seven other worlds. The Sun sits on the direction the key
- * light comes from, so Earth's lit limb and the visible star agree; every
- * planet is at its own semi-major axis from the Solar System extract.
- *
- * Clicking a planet opens the same record an exoplanet does — the entry is the
- * catalogue object itself, so `/planet/:id`, the destination picker and the
- * travel planner all see one shared planet.
- */
-function SolarSystem({ glow, onSelectPlanet }) {
-  const { camera, gl } = useThree()
-  const [hoveredId, setHoveredId] = useState(null)
-  const projection = useMemo(() => new THREE.Vector3(), [])
-
-  const pick = useCallback(
-    (clientX, clientY) => {
-      const rect = gl.domElement.getBoundingClientRect()
-      const x = clientX - rect.left
-      const y = clientY - rect.top
-      let best = null
-      let bestDistance = 28
-      for (const body of ORBIT_BODIES) {
-        projection.copy(body.position).project(camera)
-        if (projection.z < -1 || projection.z > 1) continue
-        const screenX = (projection.x * 0.5 + 0.5) * rect.width
-        const screenY = (-projection.y * 0.5 + 0.5) * rect.height
-        const distance = Math.hypot(screenX - x, screenY - y)
-        if (distance < bestDistance) {
-          bestDistance = distance
-          best = body
-        }
-      }
-      return best
-    },
-    [camera, gl, projection],
-  )
-
-  useEffect(() => {
-    const element = gl.domElement
-    let downAt = null
-    let hoveredName = null
-
-    const handleDown = (event) => {
-      downAt = { x: event.clientX, y: event.clientY }
-    }
-    const handleMove = (event) => {
-      if (downAt) return
-      const hit = pick(event.clientX, event.clientY)
-      const name = hit?.planet.id ?? null
-      if (name === hoveredName) return
-      hoveredName = name
-      setHoveredId(name)
-      element.style.cursor = hit ? 'pointer' : 'grab'
-    }
-    const handleUp = (event) => {
-      if (!downAt) return
-      const moved = Math.hypot(event.clientX - downAt.x, event.clientY - downAt.y)
-      downAt = null
-      if (moved > 5) return
-      const hit = pick(event.clientX, event.clientY)
-      if (hit) onSelectPlanet?.(hit.planet)
-    }
-    element.addEventListener('pointerdown', handleDown)
-    element.addEventListener('pointermove', handleMove)
-    element.addEventListener('pointerup', handleUp)
-    return () => {
-      element.removeEventListener('pointerdown', handleDown)
-      element.removeEventListener('pointermove', handleMove)
-      element.removeEventListener('pointerup', handleUp)
-    }
-  }, [gl, onSelectPlanet, pick])
-
-  return (
-    <group>
-      <group position={SUN_POSITION.toArray()}>
-        <mesh>
-          <sphereGeometry args={[SUN_RADIUS, 48, 48]} />
-          <meshBasicMaterial color="#fff4d8" toneMapped={false} />
-        </mesh>
-        <sprite scale={[SUN_RADIUS * 3.2, SUN_RADIUS * 3.2, 1]}>
-          <spriteMaterial
-            map={glow}
-            color="#ffd9a0"
-            transparent
-            opacity={0.55}
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-          />
-        </sprite>
-        <sprite scale={[SUN_RADIUS * 2.2, SUN_RADIUS * 2.2, 1]}>
-          <spriteMaterial
-            map={glow}
-            color="#ffffff"
-            transparent
-            opacity={0.85}
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-          />
-        </sprite>
-      </group>
-
-      {ORBIT_BODIES.map((body) => (
-        <SolarBody
-          key={body.planet.id}
-          body={body}
-          glow={glow}
-          hovered={hoveredId === body.planet.id}
-        />
-      ))}
-    </group>
-  )
-}
 
 /** The ship holds a slow, low orbit, nose along its direction of travel. */
 function OrbitingShip() {
@@ -782,7 +561,7 @@ function OrbitRig({ onZoomOut, onLimitChange }) {
   return null
 }
 
-/** Keep the Sun and its neighbours in frame on tall phone screens. */
+/** Widen the lens on tall phone screens so Earth and the Sun stay in frame. */
 function ResponsiveFraming() {
   const { camera, size } = useThree()
   useEffect(() => {
@@ -793,7 +572,7 @@ function ResponsiveFraming() {
   return null
 }
 
-function Scene({ onZoomOut, onSelectPlanet, onLimitChange }) {
+function Scene({ onZoomOut, onLimitChange }) {
   const glow = useMemo(createGlowTexture, [])
   useEffect(() => () => glow.dispose(), [glow])
 
@@ -812,7 +591,7 @@ function Scene({ onZoomOut, onSelectPlanet, onLimitChange }) {
       <directionalLight position={[2.6, 1.2, 5.5]} intensity={1.0} color="#8fb6e8" />
       <MilkyWay />
       <StarField glow={glow} />
-      <SolarSystem glow={glow} onSelectPlanet={onSelectPlanet} />
+      <Sun glow={glow} />
       <Earth />
       <OrbitingShip />
       <OrbitRig onZoomOut={onZoomOut} onLimitChange={onLimitChange} />
@@ -820,7 +599,7 @@ function Scene({ onZoomOut, onSelectPlanet, onLimitChange }) {
   )
 }
 
-const OrbitCanvas = memo(function OrbitCanvas({ onZoomOut, onSelectPlanet }) {
+const OrbitCanvas = memo(function OrbitCanvas({ onZoomOut }) {
   const [atLimit, setAtLimit] = useState(false)
 
   return (
@@ -832,16 +611,12 @@ const OrbitCanvas = memo(function OrbitCanvas({ onZoomOut, onSelectPlanet }) {
           antialias: true,
           alpha: false,
           powerPreference: 'high-performance',
-          // Neptune is ~960 units out; a logarithmic depth buffer keeps Earth's
-          // surface free of z-fighting across that range.
+          // The Sun sits 1,500 units out; a logarithmic depth buffer keeps
+          // Earth's surface free of z-fighting across that range.
           logarithmicDepthBuffer: true,
         }}
       >
-        <Scene
-          onZoomOut={onZoomOut}
-          onSelectPlanet={onSelectPlanet}
-          onLimitChange={setAtLimit}
-        />
+        <Scene onZoomOut={onZoomOut} onLimitChange={setAtLimit} />
       </Canvas>
 
       {/* Outward-scroll affordance: the handoff is a gesture, so it says so. */}
@@ -856,7 +631,7 @@ const OrbitCanvas = memo(function OrbitCanvas({ onZoomOut, onSelectPlanet }) {
   )
 })
 
-export default function EarthOrbitScene({ onZoomOut, onSelectPlanet }) {
+export default function EarthOrbitScene({ onZoomOut }) {
   if (!HAS_WEBGL) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-[#04010c] p-6 text-center">
@@ -868,5 +643,5 @@ export default function EarthOrbitScene({ onZoomOut, onSelectPlanet }) {
     )
   }
 
-  return <OrbitCanvas onZoomOut={onZoomOut} onSelectPlanet={onSelectPlanet} />
+  return <OrbitCanvas onZoomOut={onZoomOut} />
 }

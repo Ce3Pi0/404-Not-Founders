@@ -21,11 +21,21 @@ import {
   systemIdFromPath,
   usePathname,
 } from './lib/router'
-import { systemById, systemId } from './lib/starMap'
+import { SOLAR_SYSTEM, systemById, systemId } from './lib/starMap'
+import { HOME_CAMERA, HOME_TARGET } from './lib/mapCamera'
 import { missionPhysics, planMission, readPhysicsConfig } from './lib/mission'
 import { usePhysicsStore } from './store/physicsStore'
 import { emptySimulation, loadSimulation, recordMission, saveSimulation } from './lib/simulation'
 import { DEFAULT_PLANET, EARTH, distanceLyBetween, nearbyPlanets, planetById } from './lib/catalog'
+
+/**
+ * Earth is never its own destination: whenever the crew is put back on Earth the
+ * route planner needs another world to point at.
+ */
+const destinationFromEarth = (current) =>
+  current?.kind === 'earth'
+    ? (nearbyPlanets(EARTH, 8).find((entry) => entry.id !== EARTH.id) ?? current)
+    : current
 
 export default function App() {
   const pathname = usePathname()
@@ -192,10 +202,7 @@ export default function App() {
     setLocation(EARTH)
     setMission(null)
     setMissionArrived(false)
-    if (planet.kind === 'earth') {
-      const replacement = nearbyPlanets(EARTH, 8).find((entry) => entry.id !== EARTH.id)
-      if (replacement) setPlanet(replacement)
-    }
+    setPlanet(destinationFromEarth)
     goTo('destination')
   }
 
@@ -227,9 +234,25 @@ export default function App() {
       },
     )
 
-  /** Zooming into the Solar System → back into the Earth orbital scene. */
-  const returnToEarthOrbit = () =>
+  /**
+   * "Return to Earth" and the map's zoom into the Solar System both mean one
+   * fixed place: Earth. The old handler only changed the step, so the origin
+   * stayed wherever the crew actually was — from Mars it re-opened Mars, not
+   * Earth. This writes every piece of navigation state itself (origin,
+   * destination, map framing, map view), so no stale selection, previous
+   * destination or travel history can decide the outcome.
+   */
+  const returnToEarth = () =>
     beginTransition('Entering Earth orbit', () => {
+      setLocation(EARTH)
+      setPlanet(destinationFromEarth)
+      // Earth's address on the map: the Solar System selected, Earth active.
+      mapViewState.current.selected = SOLAR_SYSTEM.name
+      mapViewState.current.planetId = EARTH.id
+      mapViewState.current.camera = {
+        position: [...HOME_CAMERA],
+        target: [...HOME_TARGET],
+      }
       setMapArrival(null)
       goTo('destination')
     })
@@ -353,7 +376,6 @@ export default function App() {
           <div className="space-y-4">
             <EarthOrbitHero
               onExploreUniverse={exploreUniverse}
-              onSelectPlanet={viewPlanet}
               onStartChallenge={() => navigate(CHALLENGE_PATHS.intro)}
               onPlanRoute={() =>
                 document.getElementById('route-planner')?.scrollIntoView({
@@ -424,7 +446,7 @@ export default function App() {
               onSetOrigin={mapSetOrigin}
               onExplore={exploreSystem}
               onExit={() => goTo('destination')}
-              onReturnToEarth={returnToEarthOrbit}
+              onReturnToEarth={returnToEarth}
               onStartChallenge={() => navigate(CHALLENGE_PATHS.intro)}
             />
           ))}
